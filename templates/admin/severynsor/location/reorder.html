@@ -1,0 +1,407 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<style>
+    .reorder-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+    }
+    .location-tile {
+        cursor: grab;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 10;
+    }
+    .location-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+    }
+    .location-tile:active {
+        cursor: grabbing;
+    }
+    .location-tile.no-sensors h3 {
+        opacity: 0.5;
+    }
+    .location-tile.no-sensors .order-badge {
+        opacity: 0.5;
+    }
+    .location-tile.no-sensors .status-tag {
+        color: #ef4444; 
+    }
+    .sortable-ghost {
+        opacity: 0.15;
+        transform: scale(0.95);
+    }
+    .order-badge {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        width: 32px;
+        height: 32px;
+        background: var(--color-primary-600, #059669);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        z-index: 20;
+        border: 2px solid white;
+    }
+    .dark .order-badge {
+        border-color: #1f2937;
+    }
+    .plus-btn {
+        width: 32px;
+        height: 32px;
+        background-color: #059669;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        transition: transform 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .plus-btn:hover {
+        transform: scale(1.1);
+    }
+    .sensor-logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 2px solid white;
+        object-fit: cover;
+        transition: all 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .sensor-logo.is-hidden {
+        opacity: 0.3;
+    }
+    .dark .sensor-logo {
+        border-color: #374151;
+    }
+    .sensor-logo:hover {
+        transform: scale(1.1) translateY(-2px);
+        z-index: 50;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    #content {
+        padding-bottom: 0 !important;
+    }
+    .reorder-container {
+        padding-bottom: 5rem;
+    }
+
+    .add-location-tile {
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 2px dashed var(--color-base-200, #e5e7eb);
+        min-height: 200px;
+        transition: all 0.2s;
+    }
+    .dark .add-location-tile {
+        border-color: var(--color-base-700, #374151);
+    }
+    .add-location-tile:hover {
+        border-color: var(--color-primary-600, #059669);
+        background-color: #f9fafb;
+    }
+    .dark .add-location-tile:hover {
+        background-color: #1f2937;
+    }
+
+    /* Popup/Tooltip Styles */
+    .sensor-wrapper {
+        position: relative;
+        padding-bottom: 8px; /* Hit area padding */
+        margin-bottom: -8px; 
+    }
+    .sensor-popup {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-10px);
+        width: 240px;
+        background: white;
+        border: 1px solid var(--color-base-200, #e5e7eb);
+        border-radius: 12px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        padding: 1rem;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        pointer-events: none;
+        transform: translateX(-50%) translateY(-10px) scale(0.95);
+        transform-origin: bottom center;
+    }
+    /* Bridge to fill the gap for hover */
+    .sensor-popup::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        height: 20px;
+    }
+    .dark .sensor-popup {
+        background: #1f2937;
+        border-color: var(--color-base-700, #374151);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .sensor-wrapper:hover .sensor-popup {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(-12px) scale(1);
+        pointer-events: auto;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 20px;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #e5e7eb;
+        transition: .4s;
+        border-radius: 20px;
+    }
+    .dark .slider { background-color: #374151; }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 14px;
+        width: 14px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    input:checked + .slider {
+        background-color: #059669;
+    }
+    input:checked + .slider:before {
+        transform: translateX(20px);
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="px-4 py-3 sm:px-6 lg:px-8 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm relative z-10">
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol role="list" class="flex items-center space-x-4">
+            <li>
+                <div>
+                    <a href="{% url 'admin:index' %}" class="text-gray-400 hover:text-gray-500">
+                        <span class="material-symbols-outlined text-xl">home</span>
+                    </a>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                    <a href="{% url 'admin:app_list' app_label=opts.app_label %}" class="ml-4 text-sm font-medium text-gray-400 hover:text-gray-700">{{ opts.app_config.verbose_name }}</a>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                    <a href="{% url opts|admin_urlname:'changelist' %}" class="ml-4 text-sm font-medium text-gray-400 hover:text-gray-700">{{ opts.verbose_name_plural }}</a>
+                </div>
+            </li>
+            <li class="hidden sm:block">
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                    <span class="ml-4 text-sm font-medium text-gray-700 dark:text-gray-200" aria-current="page">Dashboard Settings</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" action="{% url 'admin:severynsor_location_reorder_save' %}" id="reorder_form">
+    {% csrf_token %}
+    <input type="hidden" name="order" id="id_order">
+    
+    <div class="reorder-container">
+        <div id="location-grid" class="reorder-grid">
+            {% for location in locations %}
+                {% with has_sensors=location.sensor_set.exists %}
+                <div class="location-tile bg-white dark:bg-base-900 border border-base-200 dark:border-base-700 p-6 rounded-xl shadow-sm relative group {% if not has_sensors %}no-sensors{% endif %}" data-id="{{ location.pk }}">
+                    <div class="order-badge" style="background-color: var(--color-primary-600, #059669);">{{ forloop.counter }}</div>
+                    
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="overflow-hidden">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1 truncate transition-opacity">{{ location.name }}</h3>
+                            <div class="flex items-center gap-2 text-xs text-gray-400 font-medium">
+                                <span class="material-symbols-outlined text-sm font-light">location_on</span>
+                                {{ location.latitude|floatformat:4 }}, {{ location.longitude|floatformat:4 }}
+                            </div>
+                        </div>
+                        <span class="material-symbols-outlined text-gray-200 dark:text-gray-700 group-hover:text-primary-600 transition-colors">drag_indicator</span>
+                    </div>
+
+                    <div class="flex items-center justify-between border-t border-base-200 dark:border-base-700 pt-5 mt-auto">
+                        <div class="flex gap-2 items-center flex-wrap">
+                            {% for sensor in location.sensor_set.all %}
+                                <div class="sensor-wrapper">
+                                    <a href="{% url 'admin:severynsor_sensor_change' sensor.pk %}" target="_blank" title="{{ sensor.title }}">
+                                        {% if sensor.image %}
+                                            <img id="sensor-logo-{{ sensor.pk }}" src="{{ sensor.image.url }}" class="sensor-logo border-2 border-white dark:border-gray-800 {% if not sensor.show_in_dashboard %}is-hidden{% endif %}" alt="{{ sensor.title }}">
+                                        {% else %}
+                                            <div id="sensor-logo-{{ sensor.pk }}" class="sensor-logo bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-[10px] text-gray-500 font-extrabold border-2 border-white dark:border-gray-800 {% if not sensor.show_in_dashboard %}is-hidden{% endif %}">
+                                                {{ sensor.title|slice:":1" }}
+                                            </div>
+                                        {% endif %}
+                                    </a>
+                                    <!-- Popup Overlay -->
+                                    <div class="sensor-popup">
+                                        <h4 class="text-sm font-bold text-gray-900 dark:text-gray-100 mb-1">{{ sensor.title }}</h4>
+                                        <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+                                            {{ sensor.description|default:"No description provided."|truncatechars:80 }}
+                                        </p>
+                                        <div class="flex items-center justify-between border-t border-base-200 dark:border-base-700 pt-3">
+                                            <span class="text-[10px] font-bold tracking-wider text-gray-400">show in dashboard</span>
+                                            <label class="toggle-switch">
+                                                <input type="checkbox" {% if sensor.show_in_dashboard %}checked{% endif %} onchange="toggleSensorDashboard(this, '{{ sensor.pk }}')">
+                                                <span class="slider"></span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <span class="status-tag text-xs text-gray-400 italic font-medium">No active sensors (hidden)</span>
+                            {% endfor %}
+                            
+                            <a href="{% url 'admin:severynsor_sensor_add' %}?location={{ location.pk }}" target="_blank" class="plus-btn ml-1" title="Add new sensor">
+                                <span class="material-symbols-outlined text-xl">add</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+            {% endfor %}
+
+            <!-- Add Location Tile -->
+            <a href="{% url 'admin:severynsor_location_add' %}" target="_blank" class="add-location-tile bg-white dark:bg-base-900 rounded-xl p-6 shadow-sm no-drag overflow-hidden">
+                <div class="plus-btn mb-4 scale-125">
+                    <span class="material-symbols-outlined text-2xl">add</span>
+                </div>
+                <span class="text-sm font-bold text-gray-500 dark:text-gray-400">Add New Location</span>
+            </a>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block footer %}
+    <div id="submit-row" class="relative lg:sticky lg:bottom-0 z-40">
+        <div class="backdrop-blur-xs bg-white/80 rounded-b-default pb-4 px-4 dark:bg-base-900/80 lg:border-t lg:border-base-200 relative lg:scrollable-top lg:py-0 dark:border-base-800">
+            <div class="flex flex-col-reverse gap-3 items-center mx-auto lg:flex-row-reverse container lg:h-[64px]">
+                <button type="submit" form="reorder_form" class="font-medium inline-flex group items-center gap-1 relative rounded-default justify-center whitespace-nowrap cursor-pointer px-3 py-2 border border-base-200 bg-primary-600 border-transparent text-white hover:bg-primary-600/80 w-full lg:w-auto h-[38px]" style="background-color: var(--color-primary-600, #059669);">
+                    {% translate 'Save Order' %}
+                </button>
+
+                <div class="flex flex-col gap-3 mr-auto w-full lg:flex-row lg:w-auto">
+                    <a href="{% url opts|admin_urlname:'changelist' %}" class="border border-base-200 cursor-pointer font-medium px-3 py-2 rounded-default text-center transition-all w-full hover:bg-base-50 lg:block lg:w-auto dark:border-base-700 dark:hover:text-base-200 dark:hover:bg-base-900 bg-white dark:bg-base-900 text-gray-700 dark:text-gray-300 h-[38px] flex items-center justify-center">
+                        {% trans 'Close' %}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    function toggleSensorDashboard(checkbox, sensorId) {
+        const logo = document.getElementById('sensor-logo-' + sensorId);
+        const isChecked = checkbox.checked;
+        
+        if (isChecked) {
+            logo.classList.remove('is-hidden');
+        } else {
+            logo.classList.add('is-hidden');
+        }
+
+        fetch('{% url "admin:severynsor_sensor_toggle_dashboard" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ sensor_id: sensorId, show: isChecked })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status !== 'success') {
+                checkbox.checked = !isChecked;
+                if (!isChecked) logo.classList.remove('is-hidden');
+                else logo.classList.add('is-hidden');
+                alert('Error updating sensor: ' + data.message);
+            }
+        })
+        .catch(error => {
+            checkbox.checked = !isChecked;
+            if (!isChecked) logo.classList.remove('is-hidden');
+            else logo.classList.add('is-hidden');
+            alert('Connection error.');
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof Sortable === 'undefined') return;
+
+        const grid = document.getElementById('location-grid');
+        const orderInput = document.getElementById('id_order');
+        
+        function updateOrder() {
+            const order = sortable.toArray();
+            orderInput.value = order.join(',');
+        }
+
+        const sortable = Sortable.create(grid, {
+            animation: 300,
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            draggable: '.location-tile',
+            filter: '.no-drag, input, label',
+            forceFallback: false,
+            onEnd: function() {
+                const badges = grid.querySelectorAll('.location-tile .order-badge');
+                badges.forEach((badge, index) => {
+                    badge.innerText = index + 1;
+                });
+                updateOrder();
+            }
+        });
+
+        updateOrder();
+    });
+</script>
+{% endblock %}

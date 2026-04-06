@@ -1,0 +1,739 @@
+{% extends 'admin/base.html' %}
+{% load i18n unfold %}
+
+{% block title %}{{ title }} | {{ site_title }}{% endblock %}
+ 
+{% block extrahead %}
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block nav-global %}
+    <li class="border min-lg:-ml-px max-lg:first:rounded-t-default min-lg:last:rounded-r-default min-lg:first:rounded-l-default hover:text-primary-600 dark:hover:text-primary-500 border-base-200 max-lg:last:rounded-b-default select-none dark:border-base-700 max-lg:-mt-px">
+        <a href="{% url 'admin:severynsor_imagesensor_change' sensor.pk %}" class="cursor-pointer flex grow items-center gap-2 px-3 py-2 text-left whitespace-nowrap">
+            <span class="material-symbols-outlined">arrow_back</span>
+            {% trans "Back to Edit" %}
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<style>
+    .preview-container {
+        max-width: 100%;
+    }
+    .preview-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    .preview-header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        object-fit: cover;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .preview-header-info h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+    }
+    .preview-header-info p {
+        margin: 2px 0 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+    .preview-back-link {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        background: var(--color-primary-50, #f0fdfa);
+        color: var(--color-primary-700, #0f766e);
+        transition: all 0.15s;
+    }
+    .preview-back-link:hover {
+        background: var(--color-primary-100, #ccfbf1);
+    }
+    .dark .preview-back-link {
+        background: rgba(255,255,255,0.06);
+        color: var(--color-primary-400, #2dd4bf);
+    }
+
+    /* Mode Tabs */
+    .mode-tabs {
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 10px;
+        background: rgba(0,0,0,0.04);
+        margin-bottom: 20px;
+        width: fit-content;
+    }
+    .dark .mode-tabs {
+        background: rgba(255,255,255,0.06);
+    }
+    .mode-tab {
+        padding: 8px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: #6b7280;
+        transition: all 0.15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .mode-tab:hover {
+        background: rgba(0,0,0,0.04);
+        color: #374151;
+    }
+    .dark .mode-tab:hover {
+        background: rgba(255,255,255,0.06);
+        color: #d1d5db;
+    }
+    .mode-tab.active {
+        background: white;
+        color: #111827;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .dark .mode-tab.active {
+        background: var(--color-base-700, #374151);
+        color: #f9fafb;
+    }
+    .mode-tab .material-symbols-outlined {
+        font-size: 18px;
+    }
+
+    /* Content panels */
+    .mode-panel {
+        display: none;
+    }
+    .mode-panel.active {
+        display: block;
+    }
+
+    /* Live panel */
+    .live-container {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .dark .live-container {
+        background: var(--color-base-900, #111827);
+        border-color: var(--color-base-800, #1f2937);
+    }
+    .live-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .dark .live-header {
+        border-color: var(--color-base-800, #1f2937);
+    }
+    .live-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .live-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #ef4444;
+        animation: pulse-dot 1.5s infinite;
+    }
+    @keyframes pulse-dot {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+    .live-video-wrap {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    .live-video-wrap video,
+    .live-video-wrap canvas,
+    .live-video-wrap img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    .live-no-stream {
+        color: #6b7280;
+        font-size: 15px;
+        text-align: center;
+        padding: 40px;
+    }
+    .live-error {
+        color: #ef4444;
+        font-size: 14px;
+        text-align: center;
+        padding: 20px;
+    }
+
+    /* History panel */
+    .history-controls {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .control-group label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b7280;
+    }
+    .control-group input[type="date"],
+    .control-group input[type="time"] {
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid #d1d5db;
+        font-size: 14px;
+        background: white;
+        color: #111827;
+        outline: none;
+        transition: border-color 0.15s;
+    }
+    .dark .control-group input[type="date"],
+    .dark .control-group input[type="time"] {
+        background: var(--color-base-900, #111827);
+        border-color: var(--color-base-700, #374151);
+        color: #f9fafb;
+    }
+    .control-group input:focus {
+        border-color: var(--color-primary-500, #14b8a6);
+        box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.15);
+    }
+    .btn-search {
+        padding: 7px 20px;
+        border-radius: 8px;
+        border: none;
+        background: var(--color-primary-600, #0d9488);
+        color: white;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: background 0.15s;
+    }
+    .btn-search:hover {
+        background: var(--color-primary-700, #0f766e);
+    }
+
+    /* Calendar dots */
+    .calendar-info {
+        font-size: 12px;
+        color: #9ca3af;
+        margin-bottom: 12px;
+    }
+    .calendar-info .has-data {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .calendar-info .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--color-primary-500, #14b8a6);
+        display: inline-block;
+    }
+
+    /* Image grid */
+    .image-results {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+    }
+    .image-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: transform 0.15s, box-shadow 0.15s;
+        cursor: pointer;
+    }
+    .dark .image-card {
+        background: var(--color-base-900, #111827);
+        border-color: var(--color-base-800, #1f2937);
+    }
+    .image-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+    .image-card img {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+    }
+    .image-card .image-meta {
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    /* Lightbox */
+    .lightbox-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(0,0,0,0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s;
+    }
+    .lightbox-overlay.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .lightbox-overlay img {
+        max-width: 90vw;
+        max-height: 85vh;
+        object-fit: contain;
+        border-radius: 8px;
+    }
+    .lightbox-close {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        color: white;
+        font-size: 28px;
+        cursor: pointer;
+        background: rgba(255,255,255,0.1);
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+    }
+    .lightbox-close:hover {
+        background: rgba(255,255,255,0.2);
+    }
+    .lightbox-timestamp {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        background: rgba(0,0,0,0.6);
+        padding: 6px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    .lightbox-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        color: white;
+        font-size: 32px;
+        cursor: pointer;
+        background: rgba(255,255,255,0.08);
+        border: none;
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+    }
+    .lightbox-nav:hover {
+        background: rgba(255,255,255,0.18);
+    }
+    .lightbox-prev { left: 20px; }
+    .lightbox-next { right: 20px; }
+
+    /* Loading / empty */
+    .history-loading,
+    .history-empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: #9ca3af;
+        font-size: 15px;
+    }
+    .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid #e5e7eb;
+        border-top-color: var(--color-primary-500, #14b8a6);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        margin: 0 auto 12px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Date picker highlight */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        cursor: pointer;
+    }
+</style>
+
+<div class="preview-container">
+    <!-- Header -->
+    <div class="preview-header">
+        {% if sensor.image %}
+            <img src="{{ sensor.image.url }}" class="preview-header-icon" alt="">
+        {% endif %}
+        <div class="preview-header-info">
+            <h1>{{ sensor.title }}</h1>
+            <p>Image Sensor · {{ sensor.location.name }}</p>
+        </div>
+        </div>
+
+    <!-- Mode Tabs -->
+    <div class="mode-tabs" id="mode-tabs">
+        {% if has_live %}
+        <button class="mode-tab active" data-mode="live">
+            <span class="material-symbols-outlined">videocam</span>
+            Live
+        </button>
+        <button class="mode-tab" data-mode="history">
+            <span class="material-symbols-outlined">history</span>
+            History
+        </button>
+        {% else %}
+        <button class="mode-tab active" data-mode="history">
+            <span class="material-symbols-outlined">history</span>
+            History
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Live Mode Panel -->
+    {% if has_live %}
+    <div class="mode-panel active" id="panel-live">
+        <div class="live-container">
+            <div class="live-header">
+                <div class="live-status">
+                    <span class="live-dot"></span>
+                    LIVE
+                </div>
+                <span style="color: #6b7280; font-size: 13px; margin-left: 8px;">{{ rtsp_url }}</span>
+                <button onclick="refreshLive()" style="margin-left: auto; background: none; border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: #6b7280; display: inline-flex; align-items: center; gap: 4px;">
+                    <span class="material-symbols-outlined" style="font-size: 14px;">refresh</span>
+                    Refresh
+                </button>
+            </div>
+            <div class="live-video-wrap" id="live-video-wrap">
+                <div class="live-no-stream" id="live-placeholder">
+                    <p>Attempting to connect to RTSP stream...</p>
+                    <p style="font-size: 12px; margin-top: 8px;">
+                        Note: Direct RTSP streaming in browsers is limited.<br>
+                        The preview will attempt to grab the latest frame from the stream.
+                    </p>
+                    <div class="spinner" style="margin-top: 16px;"></div>
+                </div>
+                <img id="live-frame" style="display:none;" alt="Live Frame">
+            </div>
+        </div>
+        <div id="live-error" class="live-error" style="display:none;"></div>
+    </div>
+    {% endif %}
+
+    <!-- History Mode Panel -->
+    <div class="mode-panel {% if not has_live %}active{% endif %}" id="panel-history">
+        <!-- Calendar info -->
+        <div class="calendar-info" id="calendar-info">
+            <span class="has-data"><span class="dot"></span> Dates with images are available – select a date to browse</span>
+        </div>
+
+        <div class="history-controls">
+            <div class="control-group">
+                <label>Date</label>
+                <input type="date" id="history-date" />
+            </div>
+            <div class="control-group">
+                <label>Time (optional)</label>
+                <input type="time" id="history-time" />
+            </div>
+            <button class="btn-search" onclick="searchHistory()">
+                <span class="material-symbols-outlined" style="font-size: 16px;">search</span>
+                Search
+            </button>
+        </div>
+
+        <div id="history-results">
+            <div class="history-empty">Select a date to browse image records.</div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox-overlay" id="lightbox">
+        <button class="lightbox-close" onclick="closeLightbox()">
+            <span class="material-symbols-outlined">close</span>
+        </button>
+        <button class="lightbox-nav lightbox-prev" onclick="lightboxNav(-1)">
+            <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <img id="lightbox-img" src="" alt="">
+        <button class="lightbox-nav lightbox-next" onclick="lightboxNav(1)">
+            <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+        <div class="lightbox-timestamp" id="lightbox-timestamp"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const SENSOR_ID = {{ sensor.pk }};
+    const HISTORY_URL = '{% url "severynsor_imagesensor_history_data" sensor.pk %}';
+    const HAS_LIVE = {{ has_live|yesno:"true,false" }};
+
+    let currentImages = [];
+    let lightboxIndex = 0;
+    let availableDates = {};
+    let liveRefreshInterval = null;
+
+    // ─── Mode tabs ───────────────────────────────────────────
+    document.getElementById('mode-tabs').querySelectorAll('.mode-tab').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.mode-tab').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            const mode = this.dataset.mode;
+            const panel = document.getElementById('panel-' + mode);
+            if (panel) panel.classList.add('active');
+
+            if (mode === 'live') {
+                startLiveRefresh();
+            } else {
+                stopLiveRefresh();
+            }
+        });
+    });
+
+    // ─── Load available dates ────────────────────────────────
+    function loadAvailableDates() {
+        fetch(`${HISTORY_URL}?action=dates`)
+            .then(r => r.json())
+            .then(data => {
+                availableDates = data.dates || {};
+                annotateCalendar();
+            });
+    }
+
+    function annotateCalendar() {
+        const dateInput = document.getElementById('history-date');
+        const dates = Object.keys(availableDates);
+        if (dates.length > 0) {
+            // Set min/max
+            dates.sort();
+            dateInput.min = dates[0];
+            dateInput.max = dates[dates.length - 1];
+
+            // Set default to latest date
+            dateInput.value = dates[dates.length - 1];
+
+            const totalImages = Object.values(availableDates).reduce((s, c) => s + c, 0);
+            document.getElementById('calendar-info').innerHTML =
+                `<span class="has-data"><span class="dot"></span> ${dates.length} days with ${totalImages} total images available</span>`;
+        }
+    }
+
+    // ─── History Search ──────────────────────────────────────
+    window.searchHistory = function() {
+        const date = document.getElementById('history-date').value;
+        const time = document.getElementById('history-time').value;
+
+        if (!date) {
+            document.getElementById('history-results').innerHTML =
+                '<div class="history-empty">Please select a date.</div>';
+            return;
+        }
+
+        document.getElementById('history-results').innerHTML =
+            '<div class="history-loading"><div class="spinner"></div>Loading images...</div>';
+
+        const params = new URLSearchParams({ action: 'search', date: date });
+        if (time) params.set('time', time);
+
+        fetch(`${HISTORY_URL}?${params}`)
+            .then(r => r.json())
+            .then(data => {
+                currentImages = data.images || [];
+                renderImages();
+            })
+            .catch(err => {
+                document.getElementById('history-results').innerHTML =
+                    '<div class="history-empty">Error loading images.</div>';
+            });
+    };
+
+    function renderImages() {
+        const container = document.getElementById('history-results');
+
+        if (currentImages.length === 0) {
+            container.innerHTML = '<div class="history-empty">No images found for this date.</div>';
+            return;
+        }
+
+        let html = '<div class="image-results">';
+        currentImages.forEach((img, idx) => {
+            html += `
+                <div class="image-card" onclick="openLightbox(${idx})">
+                    <img src="${img.url}" alt="Record ${img.id}" loading="lazy">
+                    <div class="image-meta">
+                        <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: -2px;">schedule</span>
+                        ${img.timestamp}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // ─── Lightbox ────────────────────────────────────────────
+    window.openLightbox = function(idx) {
+        lightboxIndex = idx;
+        updateLightbox();
+        document.getElementById('lightbox').classList.add('visible');
+        document.body.style.overflow = 'hidden';
+    };
+
+    window.closeLightbox = function() {
+        document.getElementById('lightbox').classList.remove('visible');
+        document.body.style.overflow = '';
+    };
+
+    window.lightboxNav = function(dir) {
+        lightboxIndex = (lightboxIndex + dir + currentImages.length) % currentImages.length;
+        updateLightbox();
+    };
+
+    function updateLightbox() {
+        if (!currentImages[lightboxIndex]) return;
+        document.getElementById('lightbox-img').src = currentImages[lightboxIndex].url;
+        document.getElementById('lightbox-timestamp').textContent = currentImages[lightboxIndex].timestamp;
+    }
+
+    // Keyboard nav for lightbox
+    document.addEventListener('keydown', function(e) {
+        const lb = document.getElementById('lightbox');
+        if (!lb.classList.contains('visible')) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'ArrowLeft') lightboxNav(-1);
+        if (e.key === 'ArrowRight') lightboxNav(1);
+    });
+
+    // Click overlay to close
+    document.getElementById('lightbox').addEventListener('click', function(e) {
+        if (e.target === this) closeLightbox();
+    });
+
+    // ─── Live Preview (frame grabbing) ──────────────────────
+    {% if has_live %}
+    function fetchLatestFrame() {
+        // Fetch most recent image record as a "live" frame
+        fetch(`${HISTORY_URL}?action=search&date=` + new Date().toISOString().split('T')[0])
+            .then(r => r.json())
+            .then(data => {
+                const images = data.images || [];
+                const placeholder = document.getElementById('live-placeholder');
+                const frame = document.getElementById('live-frame');
+                const errorDiv = document.getElementById('live-error');
+
+                if (images.length > 0) {
+                    const latest = images[images.length - 1];
+                    frame.src = latest.url;
+                    frame.style.display = 'block';
+                    placeholder.style.display = 'none';
+                    errorDiv.style.display = 'none';
+                } else {
+                    placeholder.innerHTML = `
+                        <p style="font-size: 14px;">No frames captured yet today.</p>
+                        <p style="font-size: 12px; margin-top: 4px; color: #9ca3af;">
+                            The RTSP retriever will capture frames at the configured interval.
+                        </p>
+                    `;
+                    placeholder.style.display = 'block';
+                    frame.style.display = 'none';
+                }
+            })
+            .catch(err => {
+                document.getElementById('live-error').textContent = 'Error fetching live frame: ' + err;
+                document.getElementById('live-error').style.display = 'block';
+            });
+    }
+
+    function startLiveRefresh() {
+        fetchLatestFrame();
+        if (liveRefreshInterval) clearInterval(liveRefreshInterval);
+        liveRefreshInterval = setInterval(fetchLatestFrame, 5000);
+    }
+
+    function stopLiveRefresh() {
+        if (liveRefreshInterval) {
+            clearInterval(liveRefreshInterval);
+            liveRefreshInterval = null;
+        }
+    }
+
+    window.refreshLive = function() {
+        fetchLatestFrame();
+    };
+
+    // Start live refresh if live panel is active
+    if (document.getElementById('panel-live') && document.getElementById('panel-live').classList.contains('active')) {
+        startLiveRefresh();
+    }
+    {% else %}
+    window.refreshLive = function() {};
+    {% endif %}
+
+    // ─── Init ────────────────────────────────────────────────
+    loadAvailableDates();
+
+    // Auto-search when date changes
+    document.getElementById('history-date').addEventListener('change', function() {
+        searchHistory();
+    });
+})();
+</script>
+</div>
+{% endblock %}

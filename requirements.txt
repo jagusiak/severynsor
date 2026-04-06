@@ -1,0 +1,13 @@
+Django>=4.2,<6.0
+django-unfold
+djangorestframework
+psycopg2-binary
+pillow
+gunicorn
+dj-database-url
+python-dotenv
+ruff
+django-polymorphic
+requests
+opencv-python-headless
+pytz

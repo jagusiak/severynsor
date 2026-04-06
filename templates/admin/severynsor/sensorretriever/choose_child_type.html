@@ -1,0 +1,55 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="px-4 lg:px-12 border-b border-base-200 dark:border-base-800 bg-white dark:bg-base-900 py-3">
+    <div class="flex items-center text-sm text-gray-500 dark:text-gray-400 gap-2">
+        <a href="{% url 'admin:index' %}" class="hover:text-primary-600 transition-colors">{% trans 'Home' %}</a>
+        <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+        <a href="{% url 'admin:app_list' app_label=opts.app_label %}" class="hover:text-primary-600 transition-colors">{{ opts.app_config.verbose_name }}</a>
+        <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+        <a href="{% url 'admin:severynsor_sensorretriever_changelist' %}" class="hover:text-primary-600 transition-colors">{{ opts.verbose_name_plural|capfirst }}</a>
+        <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+        <span class="text-gray-900 dark:text-gray-100 font-medium">{% trans 'Add' %}</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 lg:px-12 py-8">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Select Retriever Type</h1>
+        <p class="mt-2 text-gray-500 dark:text-gray-400">Choose the type of data retriever you want to add to your severynsor.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for model in models %}
+            <a href="{{ model.url }}" class="block no-underline group">
+                {{ model.model.get_retriever_tile_html|safe }}
+            </a>
+        {% empty %}
+            <div class="col-span-full text-center py-10 bg-white dark:bg-base-900 rounded-lg border border-dashed border-base-300 dark:border-base-700">
+                <p class="text-gray-500 dark:text-gray-400 font-medium">No available child models found.</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    /* Ensure the tiles look clickable and have nice transitions */
+    .group:hover > div {
+        border-color: var(--color-primary-500, #0d9488);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        transform: translateY(-2px);
+    }
+    
+    /* Dark mode adjustments if needed */
+    .dark .group:hover > div {
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+</style>
+{% endblock %}

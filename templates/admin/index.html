@@ -1,0 +1,208 @@
+{% extends 'admin/base.html' %}
+{% load i18n unfold %}
+
+{% block title %}
+{{ title }} | {{ site_title|default:_('Django site admin') }}
+{% endblock %}
+
+{% block branding %}
+{% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-8">
+
+    <!-- Filters -->
+    <div class="flex flex-col md:flex-row justify-between gap-4 mb-4">
+        <!-- Time Range Filter -->
+        <nav id="tabs-items-time"
+            class="bg-base-100 flex flex-row font-medium gap-1 p-1 rounded-default text-important md:w-auto *:flex *:flex-row *:gap-1 *:font-medium *:whitespace-nowrap *:items-center *:px-2.5 *:py-[5px] *:rounded-default *:hover:bg-base-700/[.06] dark:bg-white/[.06] *:dark:hover:bg-white/[.06] [&>.active]:bg-white [&>.active]:shadow-xs [&>.active]:dark:bg-base-700 [&>.active]:hover:bg-white [&>.active]:dark:hover:bg-base-700 overflow-x-auto">
+            <a href="?time_range=last_hour&granularity={{ granularity }}"
+                class="{% if time_range == 'last_hour' %}active{% endif %}">Last hour</a>
+            <a href="?time_range=last_day&granularity={{ granularity }}"
+                class="{% if time_range == 'last_day' %}active{% endif %}">Last day</a>
+            <a href="?time_range=last_week&granularity={{ granularity }}"
+                class="{% if time_range == 'last_week' %}active{% endif %}">Last week</a>
+            <a href="?time_range=last_month&granularity={{ granularity }}"
+                class="{% if time_range == 'last_month' %}active{% endif %}">Last month</a>
+            <a href="?time_range=last_year&granularity={{ granularity }}"
+                class="{% if time_range == 'last_year' %}active{% endif %}">Last year</a>
+        </nav>
+
+        <!-- Granularity Filter -->
+        <nav id="tabs-items-granularity"
+            class="bg-base-100 flex flex-row font-medium gap-1 p-1 rounded-default text-important md:w-auto *:flex *:flex-row *:gap-1 *:font-medium *:whitespace-nowrap *:items-center *:px-2.5 *:py-[5px] *:rounded-default *:hover:bg-base-700/[.06] dark:bg-white/[.06] *:dark:hover:bg-white/[.06] [&>.active]:bg-white [&>.active]:shadow-xs [&>.active]:dark:bg-base-700 [&>.active]:hover:bg-white [&>.active]:dark:hover:bg-base-700 overflow-x-auto">
+            {% if time_range in 'last_week,last_month,last_year' %}
+            <a href="#" class="opacity-50 cursor-not-allowed pointer-events-none">Minutes</a>
+            {% else %}
+            <a href="?time_range={{ time_range }}&granularity=minutes"
+                class="{% if granularity == 'minutes' %}active{% endif %}">Minutes</a>
+            {% endif %}
+
+            {% if time_range in 'last_month,last_year' %}
+            <a href="#" class="opacity-50 cursor-not-allowed pointer-events-none">Hours</a>
+            {% else %}
+            <a href="?time_range={{ time_range }}&granularity=hours"
+                class="{% if granularity == 'hours' %}active{% endif %}">Hours</a>
+            {% endif %}
+
+            <a href="?time_range={{ time_range }}&granularity=days"
+                class="{% if granularity == 'days' %}active{% endif %}">Days</a>
+        </nav>
+    </div>
+
+    <!-- Dashboard Content -->
+    {% for loc_data in dashboard_data %}
+    <div class="mb-10 block">
+        <div class="flex flex-row items-center gap-4 mb-4">
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-gray-100 m-0">{{ loc_data.location.name }}</h2>
+            <a href="{{ loc_data.map_link }}" target="_blank"
+                class="text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-500 bg-primary-100 dark:bg-primary-900/30 px-3 py-1 rounded inline-flex items-center">
+                <span class="material-symbols-outlined mr-1" style="font-size: 16px;">public</span>Open Map
+            </a>
+        </div>
+
+        <!-- Value Table and Charts -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+            <!-- Table -->
+            {% if loc_data.table.rows %}
+            {% component "unfold/components/card.html" with title="Summary" %}
+            {% component "unfold/components/table.html" with table=loc_data.table card_included=1 striped=1 %}
+            {% endcomponent %}
+            {% endcomponent %}
+            {% endif %}
+
+            <!-- Charts -->
+            {% if loc_data.charts_formatted %}
+            {% for chart in loc_data.charts_formatted %}
+            {% component "unfold/components/card.html" with title=chart.title_html %}
+            <div class="flex flex-wrap gap-3 mt-1 mb-2 text-xs">
+                {% for item in chart.legend_items %}
+                <div class="flex items-center gap-1.5 cursor-pointer transition-opacity hover:opacity-80"
+                    onclick="toggleDataset(event, this, {{ forloop.counter0 }})">
+                    {% if item.image_url %}
+                    <img src="{{ item.image_url }}" class="w-5 h-5 rounded-full object-cover border-2 shrink-0 bg-white"
+                        style="border-color: {{ item.color }};">
+                    {% else %}
+                    <span class="inline-block w-5 h-5 rounded-full border-2 shrink-0"
+                        style="background-color: {{ item.color }}; border-color: {{ item.color }};"></span>
+                    {% endif %}
+                    <span class="text-gray-600 dark:text-gray-400 font-medium">{{ item.label }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% component "unfold/components/chart/line.html" with data=chart.data class="-mt-2 w-full" height=190 %}
+            {% endcomponent %}
+            {% endcomponent %}
+            {% endfor %}
+            {% endif %}
+
+            <!-- Images -->
+            {% if loc_data.images %}
+            {% for img in loc_data.images %}
+            <div
+                class="bg-white flex flex-col grow overflow-hidden p-0 relative rounded-default shadow-xs dark:bg-base-900 dark:border-base-800 border border-base-200">
+                <div class="border-b border-base-200 flex flex-row items-center py-4 px-6 dark:border-base-800">
+                    <h2 class="font-semibold text-[15px] text-important inline-flex items-center">
+                        {% if img.sensor_image_url %}
+                        <img src="{{ img.sensor_image_url }}"
+                            class="w-5 h-5 rounded-full inline-block mr-2 object-cover border border-gray-200 dark:border-gray-700">
+                        {% endif %}
+                        {{ img.sensor.title }} <span class="text-gray-400 font-normal ml-1">
+                            {{img.timestamp|date:"Y-m-dH:i" }}</span>
+                    </h2>
+                    <div class="ml-auto">
+                        <a href="{{ img.preview_url }}"
+                            class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded bg-primary-600 text-white hover:bg-primary-700 transition-colors shadow-sm">Preview</a>
+                    </div>
+                </div>
+                <div class="grow relative w-full flex" style="min-height: 280px;">
+                    <a href="{{ img.edit_url }}" class="block w-full h-full relative grow">
+                        <img src="{{ img.image_url }}" alt="{{ img.sensor.title }}"
+                            class="absolute inset-0 w-full h-full object-cover">
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+    {% empty %}
+    <div
+        class="text-center py-10 bg-white dark:bg-base-800 rounded-lg shadow-sm border border-gray-200 dark:border-base-700">
+        <p class="text-gray-500 dark:text-gray-400 text-lg">No sensor data available for the dashboard.</p>
+    </div>
+    {% endfor %}
+
+</div>
+
+<script>
+    function toggleDataset(event, el, index) {
+        const card = el.closest('div[class*="bg-white"]') || el.closest('div');
+        if (!card) return;
+        const canvas = card.querySelector('canvas');
+        if (!canvas) return;
+
+        const chart = Chart.getChart(canvas);
+        if (!chart) return;
+
+        const isVisible = chart.isDatasetVisible(index);
+        chart.setDatasetVisibility(index, !isVisible);
+        chart.update();
+
+        if (isVisible) {
+            el.style.opacity = '0.4';
+        } else {
+            el.style.opacity = '1';
+        }
+    }
+
+    // Fix for floating point precision in charts (unrounded decimals like 8.00000000001)
+    if (typeof Chart !== 'undefined') {
+        const originalDefaults = Chart.defaults.scales.linear.ticks.callback;
+        Chart.defaults.scales.linear.ticks.callback = function(value, index, values) {
+            if (typeof value === 'number') {
+                value = Math.round(value * 1e10) / 1e10;
+            }
+            return originalDefaults ? originalDefaults.call(this, value, index, values) : value;
+        };
+
+        // Also fix for existing charts if they were already created 
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const charts = Object.values(Chart.instances);
+                charts.forEach(chart => {
+                    // Update Y axis ticks
+                    const yAxis = chart.scales.y;
+                    if (yAxis && yAxis.options.ticks) {
+                        const originalTickCallback = yAxis.options.ticks.callback;
+                        yAxis.options.ticks.callback = function(value, index, values) {
+                            if (typeof value === 'number') {
+                                value = Math.round(value * 1e10) / 1e10;
+                            }
+                            return originalTickCallback ? originalTickCallback.call(this, value, index, values) : value;
+                        };
+                    }
+                    
+                    // Update tooltips
+                    if (chart.config.options.plugins && chart.config.options.plugins.tooltip && chart.config.options.plugins.tooltip.callbacks) {
+                        const originalTooltipCallback = chart.config.options.plugins.tooltip.callbacks.label;
+                        chart.config.options.plugins.tooltip.callbacks.label = function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) {
+                                label += Math.round(context.parsed.y * 1e10) / 1e10;
+                            }
+                            // Append suffix if available in dataset (Unfold uses suffixYAxis)
+                            const suffix = context.dataset.suffixYAxis || '';
+                            return label + suffix;
+                        };
+                    }
+                    
+                    chart.update('none');
+                });
+            }, 500);
+        });
+    }
+</script>
+{% endblock %}

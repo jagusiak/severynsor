@@ -1,0 +1,483 @@
+{% extends 'admin/base.html' %}
+{% load i18n unfold %}
+
+{% block title %}{{ title }} | {{ site_title }}{% endblock %}
+ 
+{% block extrahead %}
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+{% endblock %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block nav-global %}
+    <li class="border min-lg:-ml-px max-lg:first:rounded-t-default min-lg:last:rounded-r-default min-lg:first:rounded-l-default hover:text-primary-600 dark:hover:text-primary-500 border-base-200 max-lg:last:rounded-b-default select-none dark:border-base-700 max-lg:-mt-px">
+        <a href="{% url 'admin:severynsor_valuesensor_change' sensor.pk %}" class="cursor-pointer flex grow items-center gap-2 px-3 py-2 text-left whitespace-nowrap">
+            <span class="material-symbols-outlined">arrow_back</span>
+            {% trans "Back to Edit" %}
+        </a>
+    </li>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-8">
+<style>
+    .preview-container {
+        max-width: 100%;
+    }
+    .preview-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    .preview-header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        object-fit: cover;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .preview-header-info h1 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+    }
+    .preview-header-info p {
+        margin: 2px 0 0;
+        font-size: 13px;
+        color: #6b7280;
+    }
+    .preview-back-link {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        background: var(--color-primary-50, #f0fdfa);
+        color: var(--color-primary-700, #0f766e);
+        transition: all 0.15s;
+    }
+    .preview-back-link:hover {
+        background: var(--color-primary-100, #ccfbf1);
+    }
+    .dark .preview-back-link {
+        background: rgba(255,255,255,0.06);
+        color: var(--color-primary-400, #2dd4bf);
+    }
+
+    /* Controls */
+    .preview-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 20px;
+        align-items: stretch;
+    }
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .control-group label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b7280;
+    }
+    .control-tabs {
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 10px;
+        background: rgba(0,0,0,0.04);
+    }
+    .dark .control-tabs {
+        background: rgba(255,255,255,0.06);
+    }
+    .control-tab {
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: #6b7280;
+        transition: all 0.15s;
+        white-space: nowrap;
+    }
+    .control-tab:hover {
+        background: rgba(0,0,0,0.04);
+        color: #374151;
+    }
+    .dark .control-tab:hover {
+        background: rgba(255,255,255,0.06);
+        color: #d1d5db;
+    }
+    .control-tab.active {
+        background: white;
+        color: #111827;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .dark .control-tab.active {
+        background: var(--color-base-700, #374151);
+        color: #f9fafb;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .stat-card {
+        flex: 1;
+        min-width: 120px;
+        padding: 16px 20px;
+        border-radius: 12px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .dark .stat-card {
+        background: var(--color-base-900, #111827);
+        border-color: var(--color-base-800, #1f2937);
+    }
+    .stat-card .stat-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #9ca3af;
+        margin-bottom: 4px;
+    }
+    .stat-card .stat-value {
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+    }
+    .dark .stat-card .stat-value {
+        color: #f9fafb;
+    }
+    .stat-card .stat-unit {
+        font-size: 13px;
+        font-weight: 500;
+        color: #6b7280;
+        margin-left: 2px;
+    }
+
+    /* Chart */
+    .chart-container {
+        position: relative;
+        width: 100%;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .dark .chart-container {
+        background: var(--color-base-900, #111827);
+        border-color: var(--color-base-800, #1f2937);
+    }
+    .chart-canvas-wrap {
+        position: relative;
+        width: 100%;
+        height: 420px;
+    }
+
+    /* Loading overlay */
+    .chart-loading {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.8);
+        border-radius: 14px;
+        z-index: 10;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+    }
+    .dark .chart-loading {
+        background: rgba(17,24,39,0.8);
+    }
+    .chart-loading.visible {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .spinner {
+        width: 36px;
+        height: 36px;
+        border: 3px solid #e5e7eb;
+        border-top-color: var(--color-primary-500, #14b8a6);
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .no-data-msg {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+        font-size: 15px;
+    }
+</style>
+
+<div class="preview-container">
+    <!-- Header -->
+    <div class="preview-header">
+        {% if sensor.image %}
+            <img src="{{ sensor.image.url }}" class="preview-header-icon" alt="">
+        {% endif %}
+        <div class="preview-header-info">
+            <h1>{{ sensor.title }}</h1>
+            <p>{{ sensor.get_measure_type_display }} · {{ sensor.measure_unit }} · {{ sensor.location.name }}</p>
+        </div>
+        </div>
+
+    <!-- Controls -->
+    <div class="preview-controls">
+        <div class="control-group">
+            <label>Time Range</label>
+            <div class="control-tabs" id="time-range-tabs">
+                <button class="control-tab" data-value="last_hour">1h</button>
+                <button class="control-tab" data-value="last_6h">6h</button>
+                <button class="control-tab active" data-value="last_day">24h</button>
+                <button class="control-tab" data-value="last_week">7d</button>
+                <button class="control-tab" data-value="last_month">30d</button>
+                <button class="control-tab" data-value="last_year">1y</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>Bucket</label>
+            <div class="control-tabs" id="bucket-tabs">
+                <button class="control-tab" data-value="1min">1 min</button>
+                <button class="control-tab" data-value="5min">5 min</button>
+                <button class="control-tab active" data-value="1hour">1 hour</button>
+                <button class="control-tab" data-value="1day">1 day</button>
+                <button class="control-tab" data-value="1week">1 week</button>
+            </div>
+        </div>
+        <div class="control-group">
+            <label>Function</label>
+            <div class="control-tabs" id="agg-tabs">
+                <button class="control-tab" data-value="min">Min</button>
+                <button class="control-tab active" data-value="avg">Avg</button>
+                <button class="control-tab" data-value="max">Max</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-bar" id="stats-bar">
+        <div class="stat-card">
+            <div class="stat-label">Average</div>
+            <div class="stat-value" id="stat-avg">–</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Minimum</div>
+            <div class="stat-value" id="stat-min">–</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Maximum</div>
+            <div class="stat-value" id="stat-max">–</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Records</div>
+            <div class="stat-value" id="stat-count">–</div>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-container">
+        <div class="chart-canvas-wrap">
+            <canvas id="previewChart"></canvas>
+            <div class="chart-loading" id="chart-loading">
+                <div class="spinner"></div>
+            </div>
+        </div>
+        <div class="no-data-msg" id="no-data-msg" style="display:none;">No data available for the selected range.</div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+    const SENSOR_ID = {{ sensor.pk }};
+    const DATA_URL = '{% url "severynsor_valuesensor_chart_data" sensor.pk %}';
+
+    let chart = null;
+    let currentParams = {
+        time_range: 'last_day',
+        bucket: '1hour',
+        agg_func: 'avg',
+    };
+
+    // Tab click handler
+    function initTabs(containerId, paramKey) {
+        const container = document.getElementById(containerId);
+        container.querySelectorAll('.control-tab').forEach(btn => {
+            btn.addEventListener('click', function() {
+                container.querySelectorAll('.control-tab').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentParams[paramKey] = this.dataset.value;
+                fetchData();
+            });
+        });
+    }
+
+    initTabs('time-range-tabs', 'time_range');
+    initTabs('bucket-tabs', 'bucket');
+    initTabs('agg-tabs', 'agg_func');
+
+    function showLoading(show) {
+        document.getElementById('chart-loading').classList.toggle('visible', show);
+    }
+
+    function fetchData() {
+        showLoading(true);
+        const params = new URLSearchParams(currentParams);
+        fetch(`${DATA_URL}?${params}`)
+            .then(r => r.json())
+            .then(data => {
+                showLoading(false);
+                updateStats(data.stats, data.record_count, data.measure_unit);
+                updateChart(data);
+            })
+            .catch(err => {
+                showLoading(false);
+                console.error('Chart data fetch error:', err);
+            });
+    }
+
+    function updateStats(stats, count, unit) {
+        const fmt = (val) => val !== null && val !== undefined ? `${parseFloat(val).toFixed(2)}<span class="stat-unit">${unit}</span>` : '–';
+        document.getElementById('stat-avg').innerHTML = fmt(stats.avg);
+        document.getElementById('stat-min').innerHTML = fmt(stats.min);
+        document.getElementById('stat-max').innerHTML = fmt(stats.max);
+        document.getElementById('stat-count').textContent = count ?? '–';
+    }
+
+    function updateChart(data) {
+        const noData = document.getElementById('no-data-msg');
+        const canvasWrap = document.querySelector('.chart-canvas-wrap');
+
+        if (!data.labels || data.labels.length === 0) {
+            noData.style.display = 'block';
+            canvasWrap.style.display = 'none';
+            return;
+        }
+        noData.style.display = 'none';
+        canvasWrap.style.display = 'block';
+
+        const ctx = document.getElementById('previewChart');
+
+        // Determine colors based on agg func
+        const colorMap = {
+            'min': { border: 'rgb(59, 130, 246)', bg: 'rgba(59, 130, 246, 0.08)' },
+            'avg': { border: 'rgb(20, 184, 166)', bg: 'rgba(20, 184, 166, 0.08)' },
+            'max': { border: 'rgb(239, 68, 68)', bg: 'rgba(239, 68, 68, 0.08)' },
+        };
+        const colors = colorMap[currentParams.agg_func] || colorMap['avg'];
+
+        const aggLabels = { 'min': 'Min', 'avg': 'Average', 'max': 'Max' };
+
+        if (chart) {
+            chart.data.labels = data.labels;
+            chart.data.datasets[0].data = data.data;
+            chart.data.datasets[0].label = `${data.sensor_title} (${aggLabels[currentParams.agg_func] || 'Avg'})`;
+            chart.data.datasets[0].borderColor = colors.border;
+            chart.data.datasets[0].backgroundColor = colors.bg;
+            chart.options.scales.y.title.text = data.measure_unit;
+            chart.update('none');
+        } else {
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: `${data.sensor_title} (${aggLabels[currentParams.agg_func] || 'Avg'})`,
+                        data: data.data,
+                        borderColor: colors.border,
+                        backgroundColor: colors.bg,
+                        borderWidth: 2.5,
+                        pointRadius: data.data.length > 100 ? 0 : 3,
+                        pointHoverRadius: 5,
+                        fill: true,
+                        tension: 0.25,
+                        spanGaps: true,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: { display: true, position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    let val = ctx.parsed.y;
+                                    if (typeof val === 'number') val = Math.round(val * 100) / 100;
+                                    return `${ctx.dataset.label}: ${val} ${data.measure_unit}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 20,
+                                maxRotation: 45,
+                                font: { size: 11 },
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: data.measure_unit,
+                                font: { size: 12, weight: '600' },
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    let val = value;
+                                    if (typeof val === 'number') val = Math.round(val * 100) / 100;
+                                    return val + ' ' + data.measure_unit;
+                                },
+                                font: { size: 11 },
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 400,
+                        easing: 'easeOutQuart',
+                    }
+                }
+            });
+        }
+    }
+
+    // Initial load
+    fetchData();
+})();
+</script>
+</div>
+{% endblock %}

@@ -1,0 +1,285 @@
+import json
+from datetime import timedelta
+
+from django.contrib import admin
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import permission_required
+from django.db.models import Avg, Min, Max
+from django.db.models.functions import TruncMinute, TruncHour, TruncDay, TruncWeek
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views import View
+from rest_framework import generics
+from rest_framework.permissions import BasePermission
+
+from .authentication import BearerSensorAuthentication
+from .models import (
+    Record, ValueSensor, ImageSensor, ValueRecord, ImageRecord,
+    SensorRetriever, RTSPRetriever,
+)
+from .serializers import RecordSerializer
+
+
+class IsSensorAuthenticated(BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.auth)
+
+
+class RecordCreateView(generics.CreateAPIView):
+    serializer_class = RecordSerializer
+    authentication_classes = [BearerSensorAuthentication]
+    permission_classes = [IsSensorAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+
+# ─── Preview Views ────────────────────────────────────────────────────────
+
+
+def _check_preview_permission(user):
+    return user.is_staff and user.has_perm('severynsor.can_preview_sensor')
+
+
+@staff_member_required
+def value_sensor_preview(request, object_id):
+    if not request.user.has_perm('severynsor.can_preview_sensor'):
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("You don't have permission to preview sensor data.")
+
+    sensor = get_object_or_404(ValueSensor, pk=object_id)
+    context = {
+        **admin.site.each_context(request),
+        'sensor': sensor,
+        'title': f'Preview – {sensor.title}',
+        'has_permission': True,
+        'is_popup': False,
+        'is_nav_sidebar_enabled': True,
+        'opts': ValueSensor._meta,
+    }
+    return render(request, 'admin/severynsor/valuesensor/preview.html', context)
+
+
+@staff_member_required
+def image_sensor_preview(request, object_id):
+    if not request.user.has_perm('severynsor.can_preview_sensor'):
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("You don't have permission to preview sensor data.")
+
+    sensor = get_object_or_404(ImageSensor, pk=object_id)
+
+    # Check for RTSP retrievers
+    rtsp_retrievers = RTSPRetriever.objects.filter(sensor=sensor, enabled=True)
+    has_live = rtsp_retrievers.exists()
+    rtsp_url = rtsp_retrievers.first().rtsp_url if has_live else None
+
+    context = {
+        **admin.site.each_context(request),
+        'sensor': sensor,
+        'has_live': has_live,
+        'rtsp_url': rtsp_url,
+        'title': f'Preview – {sensor.title}',
+        'has_permission': True,
+        'is_popup': False,
+        'is_nav_sidebar_enabled': True,
+        'opts': ImageSensor._meta,
+    }
+    return render(request, 'admin/severynsor/imagesensor/preview.html', context)
+
+
+# ─── API endpoints for preview dynamic data ───────────────────────────────
+
+
+@staff_member_required
+def value_sensor_chart_data(request, object_id):
+    """Return aggregated chart data for a ValueSensor."""
+    if not request.user.has_perm('severynsor.can_preview_sensor'):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    sensor = get_object_or_404(ValueSensor, pk=object_id)
+
+    # Parse params
+    time_range = request.GET.get('time_range', 'last_day')
+    bucket = request.GET.get('bucket', '1hour')
+    agg_func = request.GET.get('agg_func', 'avg')
+
+    now = timezone.now()
+    ranges = {
+        'last_hour': timedelta(hours=1),
+        'last_6h': timedelta(hours=6),
+        'last_day': timedelta(days=1),
+        'last_week': timedelta(weeks=1),
+        'last_month': timedelta(days=30),
+        'last_year': timedelta(days=365),
+    }
+    start_time = now - ranges.get(time_range, timedelta(days=1))
+
+    records = ValueRecord.objects.filter(sensor=sensor, timestamp__gte=start_time)
+
+    # Bucket (truncation)
+    trunc_map = {
+        '1min': TruncMinute('timestamp'),
+        '5min': TruncMinute('timestamp'),  # we'll handle 5min manually
+        '1hour': TruncHour('timestamp'),
+        '1day': TruncDay('timestamp'),
+        '1week': TruncWeek('timestamp'),
+    }
+
+    agg_map = {
+        'min': Min('value'),
+        'avg': Avg('value'),
+        'max': Max('value'),
+    }
+    agg_expression = agg_map.get(agg_func, Avg('value'))
+
+    if bucket == '5min':
+        # 5-minute buckets: use raw annotation with integer division
+        from django.db.models import F, ExpressionWrapper, IntegerField
+        from django.db.models.functions import Extract
+
+        # We'll use TruncMinute then round down in Python
+        chart_data = list(
+            records
+            .annotate(time_bucket=TruncMinute('timestamp'))
+            .values('time_bucket')
+            .annotate(agg_value=agg_expression)
+            .order_by('time_bucket')
+        )
+
+        # Group into 5-min buckets
+        from collections import OrderedDict
+        buckets_5min = OrderedDict()
+        for row in chart_data:
+            dt = row['time_bucket']
+            rounded_minute = (dt.minute // 5) * 5
+            bucket_key = dt.replace(minute=rounded_minute, second=0, microsecond=0)
+            if bucket_key not in buckets_5min:
+                buckets_5min[bucket_key] = []
+            buckets_5min[bucket_key].append(row['agg_value'])
+
+        # Re-aggregate
+        labels = []
+        data = []
+        for bk, vals in buckets_5min.items():
+            labels.append(bk.strftime('%Y-%m-%d %H:%M'))
+            vals_clean = [v for v in vals if v is not None]
+            if vals_clean:
+                if agg_func == 'min':
+                    data.append(round(float(min(vals_clean)), 2))
+                elif agg_func == 'max':
+                    data.append(round(float(max(vals_clean)), 2))
+                else:
+                    data.append(round(float(sum(vals_clean) / len(vals_clean)), 2))
+            else:
+                data.append(None)
+    else:
+        trunc = trunc_map.get(bucket, TruncHour('timestamp'))
+        chart_data = list(
+            records
+            .annotate(time_bucket=trunc)
+            .values('time_bucket')
+            .annotate(agg_value=agg_expression)
+            .order_by('time_bucket')
+        )
+        labels = [row['time_bucket'].strftime('%Y-%m-%d %H:%M') for row in chart_data]
+        data = [round(float(row['agg_value']), 2) if row['agg_value'] is not None else None for row in chart_data]
+
+    # Also compute summary stats
+    agg_all = records.aggregate(avg=Avg('value'), min=Min('value'), max=Max('value'))
+
+    return JsonResponse({
+        'labels': labels,
+        'data': data,
+        'sensor_title': sensor.title,
+        'measure_unit': sensor.measure_unit,
+        'measure_type': sensor.get_measure_type_display(),
+        'stats': {
+            'avg': round(agg_all['avg'], 2) if agg_all['avg'] is not None else None,
+            'min': round(agg_all['min'], 2) if agg_all['min'] is not None else None,
+            'max': round(agg_all['max'], 2) if agg_all['max'] is not None else None,
+        },
+        'record_count': records.count(),
+    })
+
+
+@staff_member_required
+def image_sensor_history_data(request, object_id):
+    """Return image record dates/search for ImageSensor preview."""
+    if not request.user.has_perm('severynsor.can_preview_sensor'):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    sensor = get_object_or_404(ImageSensor, pk=object_id)
+
+    action = request.GET.get('action', 'dates')
+
+    if action == 'dates':
+        # Return all dates that have images (for calendar annotation)
+        from django.db.models.functions import TruncDate
+        dates = (
+            ImageRecord.objects.filter(sensor=sensor, image__isnull=False)
+            .exclude(image='')
+            .annotate(date=TruncDate('timestamp'))
+            .values('date')
+            .annotate(count=Min('id'))  # just to group
+            .order_by('date')
+        )
+        # Collect counts per date
+        from collections import Counter
+        all_records = (
+            ImageRecord.objects.filter(sensor=sensor, image__isnull=False)
+            .exclude(image='')
+            .values_list('timestamp', flat=True)
+        )
+        date_counts = Counter()
+        for ts in all_records:
+            date_counts[ts.strftime('%Y-%m-%d')] += 1
+
+        return JsonResponse({
+            'dates': dict(date_counts),
+        })
+
+    elif action == 'search':
+        # Search by date and optional time
+        date_str = request.GET.get('date', '')
+        time_str = request.GET.get('time', '')
+
+        from datetime import datetime as dt
+        import pytz
+
+        if not date_str:
+            return JsonResponse({'images': []})
+
+        try:
+            target_date = dt.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return JsonResponse({'images': [], 'error': 'Invalid date format'})
+
+        qs = ImageRecord.objects.filter(
+            sensor=sensor,
+            image__isnull=False,
+            timestamp__date=target_date,
+        ).exclude(image='').order_by('timestamp')
+
+        if time_str:
+            try:
+                target_time = dt.strptime(time_str, '%H:%M').time()
+                # Find closest to this time
+                from django.db.models import F
+                from django.db.models.functions import Extract
+            except ValueError:
+                pass
+
+        images = []
+        for rec in qs[:50]:  # Limit results
+            images.append({
+                'id': rec.id,
+                'url': rec.image.url,
+                'timestamp': rec.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                'time': rec.timestamp.strftime('%H:%M:%S'),
+            })
+
+        return JsonResponse({'images': images})
+
+    return JsonResponse({'error': 'Invalid action'}, status=400)
