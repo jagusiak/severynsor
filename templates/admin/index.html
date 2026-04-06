@@ -9,6 +9,9 @@
 {% include "unfold/helpers/site_branding.html" %}
 {% endblock %}
 
+{% block content_title %}Dashboard{% endblock %}
+
+
 {% block content %}
 <div class="flex flex-col gap-8">
 
@@ -160,7 +163,7 @@
     // Fix for floating point precision in charts (unrounded decimals like 8.00000000001)
     if (typeof Chart !== 'undefined') {
         const originalDefaults = Chart.defaults.scales.linear.ticks.callback;
-        Chart.defaults.scales.linear.ticks.callback = function(value, index, values) {
+        Chart.defaults.scales.linear.ticks.callback = function (value, index, values) {
             if (typeof value === 'number') {
                 value = Math.round(value * 1e10) / 1e10;
             }
@@ -168,7 +171,7 @@
         };
 
         // Also fix for existing charts if they were already created 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => {
                 const charts = Object.values(Chart.instances);
                 charts.forEach(chart => {
@@ -176,18 +179,18 @@
                     const yAxis = chart.scales.y;
                     if (yAxis && yAxis.options.ticks) {
                         const originalTickCallback = yAxis.options.ticks.callback;
-                        yAxis.options.ticks.callback = function(value, index, values) {
+                        yAxis.options.ticks.callback = function (value, index, values) {
                             if (typeof value === 'number') {
                                 value = Math.round(value * 1e10) / 1e10;
                             }
                             return originalTickCallback ? originalTickCallback.call(this, value, index, values) : value;
                         };
                     }
-                    
+
                     // Update tooltips
                     if (chart.config.options.plugins && chart.config.options.plugins.tooltip && chart.config.options.plugins.tooltip.callbacks) {
                         const originalTooltipCallback = chart.config.options.plugins.tooltip.callbacks.label;
-                        chart.config.options.plugins.tooltip.callbacks.label = function(context) {
+                        chart.config.options.plugins.tooltip.callbacks.label = function (context) {
                             let label = context.dataset.label || '';
                             if (label) label += ': ';
                             if (context.parsed.y !== null) {
@@ -198,7 +201,7 @@
                             return label + suffix;
                         };
                     }
-                    
+
                     chart.update('none');
                 });
             }, 500);

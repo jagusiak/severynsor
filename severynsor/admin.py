@@ -6,7 +6,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from unfold.admin import ModelAdmin
 from unfold.decorators import action
-from unfold.datasets import BaseDataset
+# # from unfold.datasets import BaseDataset
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 from .constants import MeasureType
 from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever
@@ -17,105 +17,14 @@ class LocationAdmin(ModelAdmin):
     search_fields = ['name']
     exclude = ['order']
 
-    
     class Media:
         css = {
-            'all': (
-                'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-                'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined',
-            )
+            'all': ('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',)
         }
         js = (
             'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
             'js/location_map.js',
-            'https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js',
         )
-
-    def get_urls(self):
-        from django.urls import path
-        urls = super().get_urls()
-        custom_urls = [
-            path('reorder/', self.admin_site.admin_view(self.reorder_view), name='severynsor_location_reorder'),
-            path('reorder-save/', self.admin_site.admin_view(self.reorder_save), name='severynsor_location_reorder_save'),
-            path('sensor-toggle-dashboard/', self.admin_site.admin_view(self.sensor_toggle_dashboard), name='severynsor_sensor_toggle_dashboard'),
-        ]
-        return custom_urls + urls
-
-    @admin.display(description='Reorder Locations')
-
-    def reorder_action(self, request):
-        return None  # Unfold global actions can just be links or triggers.
-
-    def reorder_view(self, request):
-        if not self.has_change_permission(request):
-            from django.core.exceptions import PermissionDenied
-            raise PermissionDenied
-            
-        locations = Location.objects.prefetch_related('sensor_set').all().order_by('order', 'name')
-            
-        context = {
-            **self.admin_site.each_context(request),
-            'title': 'Reorder Locations',
-            'locations': locations,
-            'opts': self.model._meta,
-        }
-        from django.shortcuts import render
-        return render(request, 'admin/severynsor/location/reorder.html', context)
-
-
-    def sensor_toggle_dashboard(self, request):
-        if not self.has_change_permission(request):
-            from django.http import JsonResponse
-            return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
-            
-        import json
-        from django.http import JsonResponse
-        try:
-            data = json.loads(request.body)
-            sensor_id = data.get('sensor_id')
-            show = data.get('show')
-            
-            sensor = Sensor.objects.get(pk=sensor_id)
-            sensor.show_in_dashboard = show
-            sensor.save()
-            return JsonResponse({'status': 'success'})
-        except Exception as e:
-            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-
-
-    def reorder_save(self, request):
-        if not self.has_change_permission(request):
-            from django.core.exceptions import PermissionDenied
-            raise PermissionDenied
-            
-        if request.method == 'POST':
-            order_raw = request.POST.get('order', '')
-            if order_raw:
-                order_ids = order_raw.split(',')
-                from django.db import transaction
-                try:
-                    with transaction.atomic():
-                        for index, pk in enumerate(order_ids):
-                            Location.objects.filter(pk=pk).update(order=index)
-                    
-                    from django.contrib import messages
-                    messages.success(request, 'Dashboard settings updated')
-                except Exception as e:
-                    from django.contrib import messages
-                    messages.error(request, f'Error saving order: {e}')
-            
-            from django.shortcuts import redirect
-            return redirect('admin:index')
-            
-        from django.http import HttpResponseNotAllowed
-        return HttpResponseNotAllowed(['POST'])
-
-
-    # Adding a global button to reorder
-    def changelist_view(self, request, extra_context=None):
-        extra_context = extra_context or {}
-        extra_context['show_reorder_button'] = self.has_change_permission(request)
-        return super().changelist_view(request, extra_context=extra_context)
 
 
 @admin.action(description='Disable selected retrievers')
@@ -152,10 +61,10 @@ class RecordDatasetAdmin(ModelAdmin):
         return False
 
 
-class RecordDataset(BaseDataset):
-    model = Record
-    model_admin = RecordDatasetAdmin
-    tab = True
+# class RecordDataset(BaseDataset):
+#     model = Record
+#     model_admin = RecordDatasetAdmin
+#     tab = True
 
 
 class MeasureTypeFilter(admin.SimpleListFilter):
@@ -214,11 +123,6 @@ class BaseSensorChildAdmin(SensorAdminMixin, ModelAdmin, PolymorphicChildModelAd
     list_display = ['display_title', 'location', 'display_measure_type', 'placement', 'last_value', 'preview_link']
     actions_detail = ['preview_action']
     search_fields = ['title', 'location__name', 'placement']
-    
-    class Media:
-        css = {
-            'all': ('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined',)
-        }
     
     @admin.display(description="Last Value")
     def last_value(self, obj):
@@ -298,7 +202,7 @@ class BaseSensorChildAdmin(SensorAdminMixin, ModelAdmin, PolymorphicChildModelAd
 @admin.register(ValueSensor)
 class ValueSensorAdmin(BaseSensorChildAdmin):
     base_model = Sensor
-    change_form_datasets = [RecordDataset]
+    # change_form_datasets = [RecordDataset]
 
     def get_fieldsets(self, request, obj=None):
         data_fields = ['title', 'description', 'image', 'location', 'placement', 'measure_type']
@@ -321,7 +225,7 @@ class ValueSensorAdmin(BaseSensorChildAdmin):
 @admin.register(ImageSensor)
 class ImageSensorAdmin(BaseSensorChildAdmin):
     base_model = Sensor
-    change_form_datasets = [RecordDataset]
+    # change_form_datasets = [RecordDataset]
 
     def get_fieldsets(self, request, obj=None):
         data_fields = ['title', 'description', 'image', 'location', 'placement']
@@ -349,11 +253,6 @@ class SensorAdmin(SensorAdminMixin, PolymorphicParentModelAdmin, ModelAdmin):
     add_type_template = "admin/severynsor/sensor/choose_child_type.html"
     list_display = ['display_title', 'location', 'display_measure_type', 'placement', 'preview_link']
     list_filter = [PolymorphicChildModelFilter, MeasureTypeFilter, 'location', 'show_in_dashboard']
-
-    class Media:
-        css = {
-            'all': ('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined',)
-        }
 
     def add_type_view(self, request, form_url=''):
         if self.child_models:
@@ -465,11 +364,6 @@ class SensorRetrieverAdmin(PolymorphicParentModelAdmin, ModelAdmin):
     list_filter = (PolymorphicChildModelFilter, 'enabled')
     list_display = ['name', 'sensor', 'frequency_minutes', 'enabled', 'get_retriever_name']
     actions = [disable_retrievers, enable_retrievers]
-
-    class Media:
-        css = {
-            'all': ('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined',)
-        }
 
     @admin.display(description='Retriever')
     def get_retriever_name(self, obj):

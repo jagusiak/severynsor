@@ -231,12 +231,6 @@
             <li>
                 <div class="flex items-center">
                     <span class="material-symbols-outlined text-gray-400">chevron_right</span>
-                    <a href="{% url opts|admin_urlname:'changelist' %}" class="ml-4 text-sm font-medium text-gray-400 hover:text-gray-700">{{ opts.verbose_name_plural }}</a>
-                </div>
-            </li>
-            <li class="hidden sm:block">
-                <div class="flex items-center">
-                    <span class="material-symbols-outlined text-gray-400">chevron_right</span>
                     <span class="ml-4 text-sm font-medium text-gray-700 dark:text-gray-200" aria-current="page">Dashboard Settings</span>
                 </div>
             </li>
@@ -246,7 +240,7 @@
 {% endblock %}
 
 {% block content %}
-<form method="post" action="{% url 'admin:severynsor_location_reorder_save' %}" id="reorder_form">
+<form method="post" action="{% url 'dashboard_settings_save' %}" id="reorder_form">
     {% csrf_token %}
     <input type="hidden" name="order" id="id_order">
     
@@ -265,7 +259,19 @@
                                 {{ location.latitude|floatformat:4 }}, {{ location.longitude|floatformat:4 }}
                             </div>
                         </div>
-                        <span class="material-symbols-outlined text-gray-200 dark:text-gray-700 group-hover:text-primary-600 transition-colors">drag_indicator</span>
+                        <div class="flex items-center gap-1">
+                            {% if perms.severynsor.change_location %}
+                                <a href="{% url 'admin:severynsor_location_change' location.pk %}" target="_blank" class="no-drag p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-primary-600 transition-all flex items-center justify-center h-8 w-8" title="Edit Location">
+                                    <span class="material-symbols-outlined text-[20px]">edit</span>
+                                </a>
+                            {% endif %}
+                            {% if perms.severynsor.delete_location %}
+                                <a href="{% url 'admin:severynsor_location_delete' location.pk %}" target="_blank" class="no-drag p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-red-500 transition-all flex items-center justify-center h-8 w-8" title="Delete Location">
+                                    <span class="material-symbols-outlined text-[20px]">delete</span>
+                                </a>
+                            {% endif %}
+                            <span class="material-symbols-outlined text-gray-200 dark:text-gray-700 group-hover:text-primary-600 transition-colors cursor-grab active:cursor-grabbing ml-1">drag_indicator</span>
+                        </div>
                     </div>
 
                     <div class="flex items-center justify-between border-t border-base-200 dark:border-base-700 pt-5 mt-auto">
@@ -300,7 +306,7 @@
                                 <span class="status-tag text-xs text-gray-400 italic font-medium">No active sensors (hidden)</span>
                             {% endfor %}
                             
-                            <a href="{% url 'admin:severynsor_sensor_add' %}?location={{ location.pk }}" target="_blank" class="plus-btn ml-1" title="Add new sensor">
+                            <a href="{% url 'admin:severynsor_sensor_add' %}?location={{ location.pk }}" target="_blank" class="plus-btn ml-1 no-drag" title="Add new sensor">
                                 <span class="material-symbols-outlined text-xl">add</span>
                             </a>
                         </div>
@@ -310,12 +316,14 @@
             {% endfor %}
 
             <!-- Add Location Tile -->
-            <a href="{% url 'admin:severynsor_location_add' %}" target="_blank" class="add-location-tile bg-white dark:bg-base-900 rounded-xl p-6 shadow-sm no-drag overflow-hidden">
-                <div class="plus-btn mb-4 scale-125">
-                    <span class="material-symbols-outlined text-2xl">add</span>
-                </div>
-                <span class="text-sm font-bold text-gray-500 dark:text-gray-400">Add New Location</span>
-            </a>
+            {% if perms.severynsor.add_location %}
+                <a href="{% url 'admin:severynsor_location_add' %}" target="_blank" class="add-location-tile bg-white dark:bg-base-900 rounded-xl p-6 shadow-sm no-drag overflow-hidden">
+                    <div class="plus-btn mb-4 scale-125">
+                        <span class="material-symbols-outlined text-2xl">add</span>
+                    </div>
+                    <span class="text-sm font-bold text-gray-500 dark:text-gray-400">Add New Location</span>
+                </a>
+            {% endif %}
         </div>
     </div>
 </form>
@@ -330,7 +338,7 @@
                 </button>
 
                 <div class="flex flex-col gap-3 mr-auto w-full lg:flex-row lg:w-auto">
-                    <a href="{% url opts|admin_urlname:'changelist' %}" class="border border-base-200 cursor-pointer font-medium px-3 py-2 rounded-default text-center transition-all w-full hover:bg-base-50 lg:block lg:w-auto dark:border-base-700 dark:hover:text-base-200 dark:hover:bg-base-900 bg-white dark:bg-base-900 text-gray-700 dark:text-gray-300 h-[38px] flex items-center justify-center">
+                    <a href="{% url 'admin:index' %}" class="border border-base-200 cursor-pointer font-medium px-3 py-2 rounded-default text-center transition-all w-full hover:bg-base-50 lg:block lg:w-auto dark:border-base-700 dark:hover:text-base-200 dark:hover:bg-base-900 bg-white dark:bg-base-900 text-gray-700 dark:text-gray-300 h-[38px] flex items-center justify-center">
                         {% trans 'Close' %}
                     </a>
                 </div>
@@ -349,7 +357,7 @@
             logo.classList.add('is-hidden');
         }
 
-        fetch('{% url "admin:severynsor_sensor_toggle_dashboard" %}', {
+        fetch('{% url "sensor_toggle_dashboard" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

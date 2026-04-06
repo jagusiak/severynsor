@@ -7,6 +7,9 @@ from severynsor.views import (
     value_sensor_chart_data,
     image_sensor_preview,
     image_sensor_history_data,
+    dashboard_settings,
+    dashboard_settings_save,
+    sensor_toggle_dashboard,
 )
 
 urlpatterns = [
@@ -24,6 +27,15 @@ urlpatterns = [
     path('severynsor/imagesensor/<int:object_id>/preview/history-data/',
          image_sensor_history_data,
          name='severynsor_imagesensor_history_data'),
+    path('dashboard-settings/',
+         dashboard_settings,
+         name='dashboard_settings'),
+    path('dashboard-settings/save/',
+         dashboard_settings_save,
+         name='dashboard_settings_save'),
+    path('dashboard-settings/toggle-sensor/',
+         sensor_toggle_dashboard,
+         name='sensor_toggle_dashboard'),
     path('', admin.site.urls),
 ]
 

@@ -16,7 +16,7 @@ from rest_framework.permissions import BasePermission
 
 from .authentication import BearerSensorAuthentication
 from .models import (
-    Record, ValueSensor, ImageSensor, ValueRecord, ImageRecord,
+    Location, Sensor, Record, ValueSensor, ImageSensor, ValueRecord, ImageRecord,
     SensorRetriever, RTSPRetriever,
 )
 from .serializers import RecordSerializer
@@ -283,3 +283,66 @@ def image_sensor_history_data(request, object_id):
         return JsonResponse({'images': images})
 
     return JsonResponse({'error': 'Invalid action'}, status=400)
+
+@staff_member_required
+def dashboard_settings(request):
+    if not request.user.has_perm('severynsor.manage_dashboard'):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+        
+    locations = Location.objects.prefetch_related('sensor_set').all().order_by('order', 'name')
+        
+    context = {
+        **admin.site.each_context(request),
+        'title': 'Dashboard Settings',
+        'locations': locations,
+        'opts': Location._meta,
+    }
+    return render(request, 'admin/severynsor/dashboard_settings.html', context)
+
+
+@staff_member_required
+def dashboard_settings_save(request):
+    if not request.user.has_perm('severynsor.manage_dashboard'):
+        from django.http import JsonResponse
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+        
+    if request.method == 'POST':
+        order_raw = request.POST.get('order', '')
+        if order_raw:
+            order_ids = order_raw.split(',')
+            from django.db import transaction
+            try:
+                with transaction.atomic():
+                    for index, pk in enumerate(order_ids):
+                        Location.objects.filter(pk=pk).update(order=index)
+                
+                from django.contrib import messages
+                messages.success(request, 'Dashboard settings updated')
+            except Exception as e:
+                from django.contrib import messages
+                messages.error(request, f'Error saving order: {e}')
+        
+        from django.shortcuts import redirect
+        return redirect('admin:index')
+        
+    from django.http import HttpResponseNotAllowed
+    return HttpResponseNotAllowed(['POST'])
+
+
+@staff_member_required
+def sensor_toggle_dashboard(request):
+    if not request.user.has_perm('severynsor.manage_dashboard'):
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+        
+    try:
+        data = json.loads(request.body)
+        sensor_id = data.get('sensor_id')
+        show = data.get('show')
+        
+        sensor = Sensor.objects.get(pk=sensor_id)
+        sensor.show_in_dashboard = show
+        sensor.save()
+        return JsonResponse({'status': 'success'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

@@ -120,6 +120,10 @@ UNFOLD = {
             "href": lambda request: "/static/favicon.svg",
         }
     ],
+    "STYLES": [
+        "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined",
+        "css/admin.css",
+    ],
     "SIDEBAR": {
         "show_search": False,
         "show_all_applications": False,
@@ -144,6 +148,12 @@ UNFOLD = {
                 "separator": True,
                 "collapsible": True,
                 "items": [
+                    {
+                        "title": "Dashboard",
+                        "icon": "dashboard_customize",
+                        "link": reverse_lazy("dashboard_settings"),
+                        "permission": lambda request: request.user.has_perm("severynsor.manage_dashboard"),
+                    },
                     {
                         "title": "Locations",
                         "icon": "place",

@@ -8,6 +8,9 @@ class Location(models.Model):
 
     class Meta:
         ordering = ['order']
+        permissions = [
+            ("manage_dashboard", "Can manage dashboard settings"),
+        ]
 
 
     def __str__(self):
