@@ -1,0 +1,25 @@
+/* Use specificity doubling (.class.class) to win regardless of CSS loading order */
+.material-symbols-outlined.material-symbols-outlined,
+#sidebar nav span.material-symbols-outlined,
+aside nav span.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined' !important;
+    font-weight: normal !important;
+    font-style: normal !important;
+    font-size: 18px !important;
+    /* Standardize on 18px to match Unfold's expectations */
+    line-height: 1 !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+    word-wrap: normal !important;
+    direction: ltr !important;
+    -webkit-font-smoothing: antialiased !important;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'grad' 0, 'opsz' 18 !important;
+}
+
+/* Ensure active states don't force 'FILL' which makes complex icons look bulky/bigger */
+aside nav a.active span.material-symbols-outlined,
+.sidebar nav a.active span.material-symbols-outlined,
+#sidebar nav a.active span.material-symbols-outlined,
+aside nav a[class*="active"] span.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'grad' 0, 'opsz' 18 !important;
+}
