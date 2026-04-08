@@ -9,7 +9,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from unfold.admin import ModelAdmin
 from unfold.decorators import action
-# # from unfold.datasets import BaseDataset
+from unfold.datasets import BaseDataset
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 from .constants import MeasureType
@@ -82,10 +82,10 @@ class RecordDatasetAdmin(ModelAdmin):
         return False
 
 
-# class RecordDataset(BaseDataset):
-#     model = Record
-#     model_admin = RecordDatasetAdmin
-#     tab = True
+class RecordDataset(BaseDataset):
+    model = Record
+    model_admin = RecordDatasetAdmin
+    tab = True
 
 
 class MeasureTypeFilter(admin.SimpleListFilter):
@@ -223,7 +223,7 @@ class BaseSensorChildAdmin(SensorAdminMixin, ModelAdmin, PolymorphicChildModelAd
 @admin.register(ValueSensor)
 class ValueSensorAdmin(BaseSensorChildAdmin):
     base_model = Sensor
-    # change_form_datasets = [RecordDataset]
+    change_form_datasets = [RecordDataset]
 
     def get_fieldsets(self, request, obj=None):
         data_fields = ['title', 'description', 'image', 'location', 'placement', 'measure_type']
@@ -246,7 +246,7 @@ class ValueSensorAdmin(BaseSensorChildAdmin):
 @admin.register(ImageSensor)
 class ImageSensorAdmin(BaseSensorChildAdmin):
     base_model = Sensor
-    # change_form_datasets = [RecordDataset]
+    change_form_datasets = [RecordDataset]
 
     def get_fieldsets(self, request, obj=None):
         data_fields = ['title', 'description', 'image', 'location', 'placement']
