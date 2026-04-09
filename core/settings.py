@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from django.urls import reverse_lazy
+from django.templatetags.static import static
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -112,12 +113,13 @@ UNFOLD = {
     "SITE_TITLE": "Severynsor",
     "SITE_HEADER": "Severynsor",
     "INDEX_TITLE": "Dashboard",
+    "SITE_ICON": lambda request: static("favicon.svg"),
     "SITE_SYMBOL": "sensors",
     "SITE_FAVICONS": [
         {
             "rel": "icon",
             "type": "image/svg+xml",
-            "href": lambda request: "/static/favicon.svg",
+            "href": lambda request: static("favicon.svg"),
         }
     ],
     "STYLES": [
@@ -143,6 +145,18 @@ UNFOLD = {
                         "permission": lambda request: request.user.has_perm("severynsor.view_sensor"),
                     },
                     {
+                        "title": "Locations",
+                        "icon": "place",
+                        "link": reverse_lazy("admin:severynsor_location_changelist"),
+                        "permission": lambda request: request.user.has_perm("severynsor.view_location"),
+                    },
+                    {
+                        "title": "Retreivers",
+                        "icon": "download",
+                        "link": reverse_lazy("admin:severynsor_sensorretriever_changelist"),
+                        "permission": lambda request: request.user.has_perm("severynsor.view_sensorretriever"),
+                    },
+                    {
                         "title": "Activity Logs",
                         "icon": "history",
                         "link": reverse_lazy("admin:severynsor_activitylog_changelist"),
@@ -151,28 +165,9 @@ UNFOLD = {
                 ],
             },
             {
-                "title": "Settings",
+                "title": "User & Group",
                 "separator": True,
-                "collapsible": True,
                 "items": [
-                    {
-                        "title": "Dashboard",
-                        "icon": "dashboard_customize",
-                        "link": reverse_lazy("dashboard_settings"),
-                        "permission": lambda request: request.user.has_perm("severynsor.manage_dashboard"),
-                    },
-                    {
-                        "title": "Locations",
-                        "icon": "place",
-                        "link": reverse_lazy("admin:severynsor_location_changelist"),
-                        "permission": lambda request: request.user.has_perm("severynsor.view_location"),
-                    },
-                    {
-                        "title": "Sensor Retrievers",
-                        "icon": "download",
-                        "link": reverse_lazy("admin:severynsor_sensorretriever_changelist"),
-                        "permission": lambda request: request.user.has_perm("severynsor.view_sensorretriever"),
-                    },
                     {
                         "title": "Users",
                         "icon": "person",

@@ -455,26 +455,31 @@ class ActivityLogAdmin(ModelAdmin):
     def display_type(self, obj):
         icon = "download" if obj.type == ActivityLog.RETRIEVER else "api"
         return format_html(
-            '<div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm">{}</span> {}</div>',
+            '<div class="flex items-center gap-2 font-bold text-gray-900 dark:text-gray-100"><span class="material-symbols-outlined text-sm">{}</span> {}</div>',
             icon, obj.get_type_display()
         )
 
     @admin.display(description="Target")
     def display_target(self, obj):
+        target_name = "-"
         if obj.retriever:
-            return obj.retriever.name or f"Retriever #{obj.retriever.pk}"
-        if obj.sensor:
-            return obj.sensor.title
-        return "-"
+            target_name = obj.retriever.name or f"Retriever #{obj.retriever.pk}"
+        elif obj.sensor:
+            target_name = obj.sensor.title
+            
+        return format_html(
+            '<span class="font-bold text-gray-900 dark:text-gray-100">{}</span>',
+            target_name
+        )
 
     @admin.display(description="Status")
     def status_badge(self, obj):
         if obj.success:
             return format_html(
-                '<span class="px-2 py-0.5 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-bold uppercase transition-colors">Success</span>'
+                '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-bold uppercase transition-colors">Success</span>'
             )
         return format_html(
-            '<span class="px-2 py-0.5 rounded-md bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold uppercase transition-colors">Error</span>'
+            '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold uppercase transition-colors">Error</span>'
         )
 
     @admin.display(description="Duration")
