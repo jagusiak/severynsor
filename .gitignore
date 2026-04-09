@@ -9,7 +9,8 @@ venv/
 # Django
 db.sqlite3
 media/
-./static
+/static/
+!/severynsor/static/
 
 # IDEs
 .idea/

@@ -6,8 +6,12 @@ pillow
 gunicorn
 dj-database-url
 python-dotenv
+whitenoise
 ruff
 django-polymorphic
 requests
-opencv-python-headless
+opencv-python
 pytz
+channels
+daphne
+av

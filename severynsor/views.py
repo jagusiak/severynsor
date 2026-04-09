@@ -103,15 +103,15 @@ def image_sensor_preview(request, object_id):
     sensor = get_object_or_404(ImageSensor, pk=object_id)
 
     # Check for RTSP retrievers
-    rtsp_retrievers = RTSPRetriever.objects.filter(sensor=sensor, enabled=True)
-    has_live = rtsp_retrievers.exists()
-    rtsp_url = rtsp_retrievers.first().rtsp_url if has_live else None
+    rtsp_retriever = RTSPRetriever.objects.filter(sensor=sensor, enabled=True).first()
+    has_live = rtsp_retriever is not None
+    retriever_id = rtsp_retriever.id if has_live else None
 
     context = {
         **admin.site.each_context(request),
         'sensor': sensor,
         'has_live': has_live,
-        'rtsp_url': rtsp_url,
+        'retriever_id': retriever_id,
         'title': f'Preview – {sensor.title}',
         'has_permission': True,
         'is_popup': False,

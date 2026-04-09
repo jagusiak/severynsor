@@ -451,7 +451,6 @@
                     <span class="live-dot"></span>
                     LIVE
                 </div>
-                <span style="color: #6b7280; font-size: 13px; margin-left: 8px;">{{ rtsp_url }}</span>
                 <button onclick="refreshLive()" style="margin-left: auto; background: none; border: 1px solid #d1d5db; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: #6b7280; display: inline-flex; align-items: center; gap: 4px;">
                     <span class="material-symbols-outlined" style="font-size: 14px;">refresh</span>
                     Refresh
@@ -664,61 +663,85 @@
         if (e.target === this) closeLightbox();
     });
 
-    // ─── Live Preview (frame grabbing) ──────────────────────
+    // ─── Live Preview (WebSocket) ───────────────────────────
     {% if has_live %}
-    function fetchLatestFrame() {
-        // Fetch most recent image record as a "live" frame
-        fetch(`${HISTORY_URL}?action=search&date=` + new Date().toISOString().split('T')[0])
-            .then(r => r.json())
-            .then(data => {
-                const images = data.images || [];
-                const placeholder = document.getElementById('live-placeholder');
-                const frame = document.getElementById('live-frame');
-                const errorDiv = document.getElementById('live-error');
+    let socket = null;
+    const RETRIEVER_ID = {{ retriever_id }};
 
-                if (images.length > 0) {
-                    const latest = images[images.length - 1];
-                    frame.src = latest.url;
-                    frame.style.display = 'block';
-                    placeholder.style.display = 'none';
-                    errorDiv.style.display = 'none';
-                } else {
-                    placeholder.innerHTML = `
-                        <p style="font-size: 14px;">No frames captured yet today.</p>
-                        <p style="font-size: 12px; margin-top: 4px; color: #9ca3af;">
-                            The RTSP retriever will capture frames at the configured interval.
-                        </p>
-                    `;
-                    placeholder.style.display = 'block';
-                    frame.style.display = 'none';
-                }
-            })
-            .catch(err => {
-                document.getElementById('live-error').textContent = 'Error fetching live frame: ' + err;
-                document.getElementById('live-error').style.display = 'block';
-            });
+    function startLiveWebSocket() {
+        if (socket) return;
+
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/sensor/${RETRIEVER_ID}/stream/`;
+        
+        console.log('Connecting to WebSocket:', wsUrl);
+        socket = new WebSocket(wsUrl);
+        socket.binaryType = 'blob';
+
+        socket.onopen = function() {
+            console.log('WebSocket connected');
+            document.getElementById('live-placeholder').style.display = 'none';
+            document.getElementById('live-frame').style.display = 'block';
+            document.getElementById('live-error').style.display = 'none';
+        };
+
+        socket.onmessage = function(event) {
+            const blob = event.data;
+            const url = URL.createObjectURL(blob);
+            const frame = document.getElementById('live-frame');
+            
+            // To prevent flickering, we can use onload to revoke the old URL
+            const oldUrl = frame.src;
+            frame.src = url;
+            
+            if (oldUrl && oldUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(oldUrl);
+            }
+        };
+
+        socket.onclose = function(e) {
+            console.log('WebSocket closed', e.reason);
+            socket = null;
+            // Only reconnect if we're still on the live tab
+            const livePanel = document.getElementById('panel-live');
+            if (livePanel && livePanel.classList.contains('active')) {
+                setTimeout(startLiveWebSocket, 2000);
+            }
+        };
+
+        socket.onerror = function(err) {
+            console.error('WebSocket error:', err);
+            document.getElementById('live-error').textContent = 'WebSocket connection error.';
+            document.getElementById('live-error').style.display = 'block';
+        };
     }
 
-    function startLiveRefresh() {
-        fetchLatestFrame();
-        if (liveRefreshInterval) clearInterval(liveRefreshInterval);
-        liveRefreshInterval = setInterval(fetchLatestFrame, 5000);
-    }
-
-    function stopLiveRefresh() {
-        if (liveRefreshInterval) {
-            clearInterval(liveRefreshInterval);
-            liveRefreshInterval = null;
+    function stopLiveWebSocket() {
+        if (socket) {
+            socket.close();
+            socket = null;
         }
     }
 
     window.refreshLive = function() {
-        fetchLatestFrame();
+        stopLiveWebSocket();
+        setTimeout(startLiveWebSocket, 100);
     };
 
-    // Start live refresh if live panel is active
+    // Tab switching support
+    document.getElementById('mode-tabs').querySelectorAll('.mode-tab').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const mode = this.dataset.mode;
+            if (mode === 'live') {
+                startLiveWebSocket();
+            } else {
+                stopLiveWebSocket();
+            }
+        });
+    });
+
     if (document.getElementById('panel-live') && document.getElementById('panel-live').classList.contains('active')) {
-        startLiveRefresh();
+        startLiveWebSocket();
     }
     {% else %}
     window.refreshLive = function() {};
