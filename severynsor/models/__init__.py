@@ -5,6 +5,7 @@ from .sensor_retriever import SensorRetriever
 from .open_meteo_retriever import OpenMeteoRetriever
 from .open_weather_map_retriever import OpenWeatherMapRetriever
 from .rtsp_retriever import RTSPRetriever
+from .system_data_retriever import SystemDataRetriever
 
 __all__ = [
     'Location',
@@ -18,4 +19,5 @@ __all__ = [
     'OpenMeteoRetriever',
     'OpenWeatherMapRetriever',
     'RTSPRetriever',
+    'SystemDataRetriever',
 ]

@@ -12,6 +12,7 @@ class MeasureType(models.TextChoices):
     AQI = 'aqi', 'Air Quality Index (AQI)'
     PRECIPITATION = 'precipitation', 'Precipitation'
     APPARENT_TEMPERATURE = 'apparent_temperature', 'Apparent Temperature'
+    DISK_USED = 'disk_used', 'Disk Used'
 
 MEASURE_UNITS = {
     MeasureType.TEMPERATURE: 'C',
@@ -25,4 +26,5 @@ MEASURE_UNITS = {
     MeasureType.AQI: '',
     MeasureType.PRECIPITATION: 'mm',
     MeasureType.APPARENT_TEMPERATURE: 'C',
+    MeasureType.DISK_USED: '%',
 }

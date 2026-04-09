@@ -161,7 +161,8 @@ def dashboard_callback(request, context):
             
             sensor_images = list(set([ds['sensor'].image.url for ds in datasets if bool(ds['sensor'].image)]))
             images_html = "".join([f'<img src="{url}" class="w-5 h-5 rounded-full inline-block mr-1 object-cover border border-gray-200 dark:border-gray-700" />' for url in sensor_images])
-            title_html = mark_safe(f'<div class="flex items-center">{images_html}<span>{m_type.title()}</span></div>')
+            display_name = datasets[0]['sensor'].get_measure_type_display()
+            title_html = mark_safe(f'<div class="flex items-center">{images_html}<span>{display_name}</span></div>')
             
             charts_formatted.append({
                 'measure_type': m_type,

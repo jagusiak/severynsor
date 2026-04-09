@@ -13,7 +13,7 @@ from unfold.datasets import BaseDataset
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 from .constants import MeasureType
-from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever
+from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever, SystemDataRetriever
 
 try:
     admin.site.unregister(User)
@@ -377,10 +377,23 @@ class RTSPRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
             ro.append('sensor')
         return ro
 
+@admin.register(SystemDataRetriever)
+class SystemDataRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
+    base_model = SensorRetriever
+    list_display = ['name', 'sensor', 'frequency_minutes', 'enabled']
+    list_filter = ['enabled']
+    actions = [disable_retrievers, enable_retrievers]
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if obj and 'sensor' not in ro:
+            ro.append('sensor')
+        return ro
+
 @admin.register(SensorRetriever)
 class SensorRetrieverAdmin(PolymorphicParentModelAdmin, ModelAdmin):
     base_model = SensorRetriever
-    child_models = (OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever)
+    child_models = (OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever, SystemDataRetriever)
     add_type_template = "admin/severynsor/sensorretriever/choose_child_type.html"
     list_filter = (PolymorphicChildModelFilter, 'enabled')
     list_display = ['name', 'sensor', 'frequency_minutes', 'enabled', 'get_retriever_name']
