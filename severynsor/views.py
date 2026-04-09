@@ -248,28 +248,20 @@ def image_sensor_history_data(request, object_id):
 
     if action == 'dates':
         # Return all dates that have images (for calendar annotation)
+        from django.db.models import Count
         from django.db.models.functions import TruncDate
-        dates = (
+        
+        date_counts = (
             ImageRecord.objects.filter(sensor=sensor, image__isnull=False)
             .exclude(image='')
             .annotate(date=TruncDate('timestamp'))
             .values('date')
-            .annotate(count=Min('id'))  # just to group
+            .annotate(count=Count('id'))
             .order_by('date')
         )
-        # Collect counts per date
-        from collections import Counter
-        all_records = (
-            ImageRecord.objects.filter(sensor=sensor, image__isnull=False)
-            .exclude(image='')
-            .values_list('timestamp', flat=True)
-        )
-        date_counts = Counter()
-        for ts in all_records:
-            date_counts[ts.strftime('%Y-%m-%d')] += 1
-
+        
         return JsonResponse({
-            'dates': dict(date_counts),
+            'dates': {d['date'].strftime('%Y-%m-%d'): d['count'] for d in date_counts},
         })
 
     elif action == 'search':
@@ -278,41 +270,47 @@ def image_sensor_history_data(request, object_id):
         time_str = request.GET.get('time', '')
 
         from datetime import datetime as dt
-        import pytz
-
+        
         if not date_str:
             return JsonResponse({'images': []})
 
         try:
             target_date = dt.strptime(date_str, '%Y-%m-%d').date()
+            
+            qs = ImageRecord.objects.filter(
+                sensor=sensor,
+                image__isnull=False,
+                timestamp__date=target_date,
+            ).exclude(image='').order_by('timestamp')
+
+            # Optional time filtering (closest to)
+            if time_str:
+                try:
+                    # simplistic time filter for now, could be improved to find 'closest'
+                    # for now we just filter by the day and maybe limit or order
+                    pass
+                except ValueError:
+                    pass
+
+            images = []
+            for rec in qs[:100]:  # Increased limit slightly
+                try:
+                    # Ensure the image actually exists in the DB record
+                    if rec.image:
+                        images.append({
+                            'id': rec.id,
+                            'url': rec.image.url,
+                            'timestamp': rec.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                            'time': rec.timestamp.strftime('%H:%M:%S'),
+                        })
+                except Exception:
+                    continue
+
+            return JsonResponse({'images': images})
         except ValueError:
-            return JsonResponse({'images': [], 'error': 'Invalid date format'})
-
-        qs = ImageRecord.objects.filter(
-            sensor=sensor,
-            image__isnull=False,
-            timestamp__date=target_date,
-        ).exclude(image='').order_by('timestamp')
-
-        if time_str:
-            try:
-                target_time = dt.strptime(time_str, '%H:%M').time()
-                # Find closest to this time
-                from django.db.models import F
-                from django.db.models.functions import Extract
-            except ValueError:
-                pass
-
-        images = []
-        for rec in qs[:50]:  # Limit results
-            images.append({
-                'id': rec.id,
-                'url': rec.image.url,
-                'timestamp': rec.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                'time': rec.timestamp.strftime('%H:%M:%S'),
-            })
-
-        return JsonResponse({'images': images})
+            return JsonResponse({'images': [], 'error': 'Invalid date format'}, status=400)
+        except Exception as e:
+            return JsonResponse({'images': [], 'error': str(e)}, status=500)
 
     return JsonResponse({'error': 'Invalid action'}, status=400)
 

@@ -1,4 +1,4 @@
-.PHONY: build setup up down test lint create-app migrate makemigrations grab-data collectstatic
+.PHONY: build setup up down test lint create-app migrate makemigrations grab-data collectstatic optimize-media
 
 # Build the docker image
 build:
@@ -47,3 +47,7 @@ grab-data:
 # Collect static files
 collectstatic:
 	docker-compose run --rm web python manage.py collectstatic --noinput
+
+# Optimize all images in media directory
+optimize-media:
+	docker-compose exec web python manage.py optimize_media

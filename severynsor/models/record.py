@@ -1,4 +1,6 @@
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from polymorphic.models import PolymorphicModel
 from .sensor import Sensor
 
@@ -54,6 +56,19 @@ class ValueRecord(Record):
 class ImageRecord(Record):
     image = models.ImageField(upload_to='records/', blank=True, null=True)
 
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None or kwargs.get('force_insert', False)
+        super().save(*args, **kwargs)
+        if is_new and self.image and hasattr(self.image, 'path'):
+            import subprocess
+            try:
+                # Run optimization on the saved file
+                # --quiet: no output
+                subprocess.run(['optimize-images', '--quiet', self.image.path], capture_output=True)
+            except Exception:
+                # Fail gracefully if optimization fails
+                pass
+
     def __str__(self):
         return f"{self.sensor.title} - Image at {self.timestamp}"
 
@@ -62,3 +77,16 @@ class ImageRecord(Record):
             from django.utils.html import format_html
             return format_html('<img src="{}" style="width: 48px; height: 48px; border-radius: 4px; object-fit: cover;" />', self.image.url)
         return "-"
+
+@receiver(post_delete, sender=ImageRecord)
+def delete_image_file(sender, instance, **kwargs):
+    """
+    Deletes image file from filesystem when corresponding ImageRecord is deleted.
+    """
+    if instance.image:
+        import os
+        if os.path.isfile(instance.image.path):
+            try:
+                os.remove(instance.image.path)
+            except Exception:
+                pass

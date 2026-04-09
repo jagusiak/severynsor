@@ -16,3 +16,4 @@ channels
 daphne
 av
 uvicorn
+optimize-images
