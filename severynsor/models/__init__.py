@@ -6,6 +6,7 @@ from .open_meteo_retriever import OpenMeteoRetriever
 from .open_weather_map_retriever import OpenWeatherMapRetriever
 from .rtsp_retriever import RTSPRetriever
 from .system_data_retriever import SystemDataRetriever
+from .log import ActivityLog
 
 __all__ = [
     'Location',
@@ -20,4 +21,5 @@ __all__ = [
     'OpenWeatherMapRetriever',
     'RTSPRetriever',
     'SystemDataRetriever',
+    'ActivityLog',
 ]

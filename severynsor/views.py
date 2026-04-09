@@ -33,7 +33,39 @@ class RecordCreateView(generics.CreateAPIView):
     permission_classes = [IsSensorAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save()
+        from .models.log import ActivityLog
+        import time
+        
+        start_time = timezone.now()
+        start_ts = time.time()
+        
+        try:
+            instance = serializer.save()
+            duration = time.time() - start_ts
+            
+            ActivityLog.objects.create(
+                type=ActivityLog.API_CALL,
+                sensor=instance.sensor if hasattr(instance, 'sensor') else None,
+                timestamp=start_time,
+                success=True,
+                duration=duration,
+                url=self.request.build_absolute_uri()
+            )
+        except Exception as e:
+            duration = time.time() - start_ts
+            # Attempt to get sensor from request auth if available
+            sensor = self.request.auth if hasattr(self.request, 'auth') else None
+            
+            ActivityLog.objects.create(
+                type=ActivityLog.API_CALL,
+                sensor=sensor,
+                timestamp=start_time,
+                success=False,
+                error_message=str(e),
+                duration=duration,
+                url=self.request.build_absolute_uri()
+            )
+            raise e
 
 
 # ─── Preview Views ────────────────────────────────────────────────────────

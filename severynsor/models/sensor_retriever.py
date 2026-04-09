@@ -90,6 +90,14 @@ class SensorRetriever(PolymorphicModel):
     def grab_data(self):
         raise NotImplementedError
 
+    def make_api_call(self, url, method='GET', **kwargs):
+        import requests
+        try:
+            response = requests.request(method, url, **kwargs)
+            return response
+        except Exception as e:
+            raise e
+
     def __str__(self):
         if self.name:
             return self.name

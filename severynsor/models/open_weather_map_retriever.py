@@ -62,7 +62,7 @@ class OpenWeatherMapRetriever(SensorRetriever):
         if endpoint == 'weather':
             url += "&units=metric"
             
-        response = requests.get(url)
+        response = self.make_api_call(url)
         if response.status_code == 200:
             data = response.json()
             value = None

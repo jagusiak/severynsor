@@ -47,7 +47,7 @@ class OpenMeteoRetriever(SensorRetriever):
 
     def grab_data(self):
         url = f"https://api.open-meteo.com/v1/forecast?latitude={self.sensor.location.latitude}&longitude={self.sensor.location.longitude}&current={self.current_type}"
-        response = requests.get(url)
+        response = self.make_api_call(url)
         if response.status_code == 200:
             data = response.json()
             value = data.get('current', {}).get(self.current_type)

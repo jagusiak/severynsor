@@ -141,6 +141,11 @@ UNFOLD = {
                         "icon": "sensors",
                         "link": reverse_lazy("admin:severynsor_sensor_changelist"),
                     },
+                    {
+                        "title": "Activity Logs",
+                        "icon": "history",
+                        "link": reverse_lazy("admin:severynsor_activitylog_changelist"),
+                    },
                 ],
             },
             {

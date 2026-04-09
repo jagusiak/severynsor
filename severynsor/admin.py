@@ -13,7 +13,7 @@ from unfold.datasets import BaseDataset
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 from .constants import MeasureType
-from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever, SystemDataRetriever
+from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever, SystemDataRetriever, ActivityLog
 
 try:
     admin.site.unregister(User)
@@ -443,3 +443,48 @@ class SensorRetrieverAdmin(PolymorphicParentModelAdmin, ModelAdmin):
             return render(request, self.add_type_template, context)
             
         return super().add_type_view(request, form_url)
+
+@admin.register(ActivityLog)
+class ActivityLogAdmin(ModelAdmin):
+    list_display = ['timestamp', 'display_type', 'display_target', 'status_badge', 'duration_display']
+    list_filter = ['type', 'success', 'timestamp', 'sensor', 'retriever']
+    search_fields = ['error_message', 'url', 'sensor__title', 'retriever__name']
+    readonly_fields = ['type', 'sensor', 'retriever', 'timestamp', 'success', 'error_message', 'url', 'status_code', 'duration']
+    
+    @admin.display(description="Type")
+    def display_type(self, obj):
+        icon = "download" if obj.type == ActivityLog.RETRIEVER else "api"
+        return format_html(
+            '<div class="flex items-center gap-2"><span class="material-symbols-outlined text-sm">{}</span> {}</div>',
+            icon, obj.get_type_display()
+        )
+
+    @admin.display(description="Target")
+    def display_target(self, obj):
+        if obj.retriever:
+            return obj.retriever.name or f"Retriever #{obj.retriever.pk}"
+        if obj.sensor:
+            return obj.sensor.title
+        return "-"
+
+    @admin.display(description="Status")
+    def status_badge(self, obj):
+        if obj.success:
+            return format_html(
+                '<span class="px-2 py-0.5 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-bold uppercase transition-colors">Success</span>'
+            )
+        return format_html(
+            '<span class="px-2 py-0.5 rounded-md bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold uppercase transition-colors">Error</span>'
+        )
+
+    @admin.display(description="Duration")
+    def duration_display(self, obj):
+        if obj.duration:
+            return f"{obj.duration:.3f}s"
+        return "-"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
