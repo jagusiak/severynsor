@@ -49,6 +49,9 @@
         font-size: 13px;
         color: #6b7280;
     }
+    .dark .preview-header-info p {
+        color: #9ca3af;
+    }
     .preview-back-link {
         margin-left: auto;
         display: inline-flex;
@@ -214,6 +217,9 @@
         font-weight: 500;
         color: #6b7280;
     }
+    .dark .control-group label {
+        color: #9ca3af;
+    }
     .control-group input[type="date"],
     .control-group input[type="time"] {
         padding: 7px 12px;
@@ -230,6 +236,11 @@
         background: var(--color-base-900, #111827);
         border-color: var(--color-base-700, #374151);
         color: #f9fafb;
+        color-scheme: dark;
+    }
+    .dark input[type="date"]::-webkit-calendar-picker-indicator,
+    .dark input[type="time"]::-webkit-calendar-picker-indicator {
+        filter: invert(100%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(200%) contrast(100%);
     }
     .control-group input:focus {
         border-color: var(--color-primary-500, #14b8a6);

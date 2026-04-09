@@ -8,6 +8,31 @@ class Command(BaseCommand):
     help = 'Grabs sensor data from all configured retrievers'
 
     def handle(self, *args, **options):
+        import os
+        import fcntl
+        from django.conf import settings
+        
+        # Use lock file path from settings
+        lock_file_path = settings.GRAB_DATA_LOCK_FILE
+        
+        # Open (or create) the lock file
+        self.lock_file = open(lock_file_path, 'w')
+        
+        try:
+            # Try to acquire an exclusive lock without blocking (LOCK_NB)
+            fcntl.flock(self.lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except IOError:
+            self.stdout.write(self.style.WARNING('Data retrieval is already in progress. Skipping this run.'))
+            return
+
+        try:
+            self._do_grab_data()
+        finally:
+            # Release the lock and close the file
+            fcntl.flock(self.lock_file, fcntl.LOCK_UN)
+            self.lock_file.close()
+
+    def _do_grab_data(self):
         retrievers = SensorRetriever.objects.all()
         count = 0
         self.stdout.write(self.style.NOTICE(f'Checking {retrievers.count()} retrievers...'))
@@ -29,8 +54,6 @@ class Command(BaseCommand):
                     )
                 except NotImplementedError:
                     self.stdout.write(self.style.WARNING(f'Retriever {retriever} has not implemented grab_data().'))
-                    # We don't log NotImplementedError as a failure if it's the base class, 
-                    # but actually it is a failure of configuration if it's meant to run.
                     ActivityLog.objects.create(
                         type=ActivityLog.RETRIEVER,
                         sensor=retriever.sensor,

@@ -113,6 +113,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SENSOR_GRAPH_LIMIT = 500
+GRAB_DATA_LOCK_FILE = os.environ.get('GRAB_DATA_LOCK_FILE', '/tmp/severynsor_grab_data.lock')
 
 UNFOLD = {
     "SITE_TITLE": "Severynsor",
