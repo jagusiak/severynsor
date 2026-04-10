@@ -1,9 +1,12 @@
 import cv2
+import logging
 from django.db import models
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from .sensor_retriever import SensorRetriever
 from .record import ImageRecord
+
+logger = logging.getLogger(__name__)
 
 class RTSPRetriever(SensorRetriever):
     rtsp_url = models.CharField(max_length=255)
@@ -24,7 +27,11 @@ class RTSPRetriever(SensorRetriever):
 
     def grab_data(self):
         # validation for image sensor is handled in clean.
+        logger.info(f"Grabbing image from RTSP URL: {self.rtsp_url}")
         cap = cv2.VideoCapture(self.rtsp_url)
+        if not cap.isOpened():
+            raise Exception(f"Failed to open RTSP stream: {self.rtsp_url}")
+
         ret, frame = cap.read()
         cap.release()
         
@@ -38,3 +45,10 @@ class RTSPRetriever(SensorRetriever):
                     timestamp=timezone.now(),
                     image=image_content
                 )
+                logger.debug(f"Successfully grabbed and saved image from {self.rtsp_url}")
+            else:
+                raise Exception(f"Failed to encode image from {self.rtsp_url}")
+        else:
+            raise Exception(f"Failed to read frame from RTSP stream: {self.rtsp_url}")
+
+

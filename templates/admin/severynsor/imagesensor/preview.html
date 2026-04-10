@@ -544,10 +544,10 @@
             const panel = document.getElementById('panel-' + mode);
             if (panel) panel.classList.add('active');
 
-            if (mode === 'live') {
-                startLiveRefresh();
-            } else {
-                stopLiveRefresh();
+            if (mode === 'live' && typeof startLiveWebSocket === 'function') {
+                startLiveWebSocket();
+            } else if (typeof stopLiveWebSocket === 'function') {
+                stopLiveWebSocket();
             }
         });
     });

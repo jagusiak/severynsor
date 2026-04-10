@@ -6,13 +6,16 @@ from .sensor_retriever import SensorRetriever
 class ActivityLog(models.Model):
     RETRIEVER = 'retriever'
     API_CALL = 'api_call'
+    LIVE_STREAM = 'live_stream'
     
     TYPE_CHOICES = [
         (RETRIEVER, 'Retriever Execution'),
         (API_CALL, 'API Call'),
+        (LIVE_STREAM, 'Live Stream'),
     ]
 
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=RETRIEVER)
+
     sensor = models.ForeignKey(Sensor, on_delete=models.CASCADE, null=True, blank=True, related_name='activity_logs')
     retriever = models.ForeignKey(SensorRetriever, on_delete=models.CASCADE, null=True, blank=True, related_name='activity_logs')
     timestamp = models.DateTimeField(default=timezone.now)
