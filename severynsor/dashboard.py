@@ -5,7 +5,8 @@ from django.db.models import Avg, Min, Max
 from django.db.models.functions import TruncMinute, TruncHour, TruncDay
 
 def dashboard_callback(request, context):
-    from severynsor.models import Location, ValueSensor, ImageSensor, ValueRecord, ImageRecord
+    from severynsor.models import Location, ValueSensor, ImageSensor, ValueRecord, ImageRecord, Alarm
+    from django.db import models
 
     time_range = request.GET.get('time_range', 'last_day')
     granularity = request.GET.get('granularity', 'hours')
@@ -31,6 +32,16 @@ def dashboard_callback(request, context):
         start_time = now - timedelta(days=365)
     else:
         start_time = now - timedelta(days=1)
+
+    # Fetch active, non-snoozed alarms for the current user
+    active_alarms = Alarm.objects.filter(
+        user=request.user, 
+        state=True
+    ).filter(
+        models.Q(snooze_until__isnull=True) | models.Q(snooze_until__lte=now)
+    )
+    # Map sensor ID to the first active alarm ID
+    sensor_alarm_map = {a.sensor_id: a.id for a in active_alarms}
 
     locations = Location.objects.order_by('order', 'name')
     
@@ -112,8 +123,14 @@ def dashboard_callback(request, context):
                 
             image_tag = f'<img src="{r["sensor"].image.url}" class="w-5 h-5 rounded-full inline-block mr-2 object-cover border border-gray-200 dark:border-gray-700" />' if bool(r["sensor"].image) else ''
             
+            alarm_badge = ""
+            if r['sensor'].pk in sensor_alarm_map:
+                alarm_id = sensor_alarm_map[r['sensor'].pk]
+                alarm_url = reverse('admin:severynsor_alarm_change', args=[alarm_id])
+                alarm_badge = f'<a href="{alarm_url}" class="ml-2 inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-600 rounded-full hover:bg-red-700" title="Active Alarm!"><span class="material-symbols-outlined text-[14px]">priority_high</span></a>'
+
             loc_data['table']['rows'].append([
-                mark_safe(f'<a href="{url}" class="font-medium text-primary-600 dark:text-primary-500 hover:underline md:inline-flex items-center">{image_tag}{r["sensor"].title}</a>'),
+                mark_safe(f'<div class="flex items-center"><a href="{url}" class="font-medium text-primary-600 dark:text-primary-500 hover:underline md:inline-flex items-center">{image_tag}{r["sensor"].title}</a>{alarm_badge}</div>'),
                 f"{r['avg']} {r['measure_unit']}",
                 f"{r['min']} {r['measure_unit']}",
                 f"{r['max']} {r['measure_unit']}",

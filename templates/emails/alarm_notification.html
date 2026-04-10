@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #f3f4f6;
+        padding: 40px 20px;
+        margin: 0;
+    }
+    .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+    }
+    .header {
+        padding: 32px;
+        text-align: center;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .status-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+    .content {
+        padding: 32px;
+        line-height: 1.6;
+        color: #374151;
+    }
+    .bubble {
+        background-color: #f9fafb;
+        border-radius: 12px;
+        padding: 24px;
+        margin: 20px 0;
+        border: 1px solid #e5e7eb;
+    }
+    .footer {
+        padding: 24px;
+        text-align: center;
+        font-size: 13px;
+        color: #6b7280;
+        background-color: #f9fafb;
+    }
+    .button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #14b8a6;
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        margin-top: 16px;
+    }
+    .link {
+        color: #14b8a6;
+        text-decoration: none;
+        font-weight: 600;
+    }
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="status-icon">{% if alarm.state %}🔴{% else %}🟢{% endif %}</div>
+            <h2 style="margin: 0; color: #111827;">{{ alarm.title }} Notification</h2>
+        </div>
+        <div class="content">
+            <p>Hello {{ alarm.user.username }},</p>
+            
+            <div class="bubble">
+                <a href="{{ alarm_url }}" class="link">{{ alarm.title }}</a> is 
+                <strong>{% if alarm.state %}ON{% else %}OFF{% endif %}</strong> 
+                at {{ timestamp|date:"Y-m-d H:i:s" }}.
+            </div>
+
+            <p>
+                Check the latest data for <a href="{{ sensor_url }}" class="link">{{ sensor.title }}</a>.
+            </p>
+            
+            <a href="{{ sensor_url }}" class="button">View Sensor Preview</a>
+        </div>
+        <div class="footer">
+            Sent by Severynsor Monitors
+        </div>
+    </div>
+</body>
+</html>

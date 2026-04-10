@@ -1,0 +1,282 @@
+<div class="condition-builder-root" id="builder-{{ name }}">
+    <style>
+        .cb-node {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: white;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            transition: all 0.2s;
+        }
+        .dark .cb-node {
+            background: #1e293b;
+            border-color: #334155;
+        }
+        .cb-node:hover {
+            border-color: var(--color-primary-500, #14b8a6);
+        }
+        .cb-children {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-left: 24px;
+            border-left: 2px dashed #e5e7eb;
+            padding-left: 16px;
+            margin-top: 8px;
+        }
+        .dark .cb-children {
+            border-color: #334155;
+        }
+        .cb-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .cb-select, .cb-input {
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            font-size: 13px;
+            background: white;
+            color: #1f2937;
+        }
+        .dark .cb-select, .dark .cb-input {
+            background: #0f172a;
+            border-color: #334155;
+            color: #f8fafc;
+        }
+        .cb-btn {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .cb-btn-add {
+            background: var(--color-primary-100, #ccfbf1);
+            color: var(--color-primary-700, #0f766e);
+        }
+        .dark .cb-btn-add {
+            background: rgba(20, 184, 166, 0.2);
+            color: #2dd4bf;
+        }
+        .cb-btn-remove {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .dark .cb-btn-remove {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+        .cb-arg-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #64748b;
+            min-width: 60px;
+        }
+        .cb-arg-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+    </style>
+
+    <div id="cb-container-{{ name }}"></div>
+
+    <input type="hidden" name="{{ name }}" id="cb-input-{{ name }}" value='{{ value|safe }}'>
+
+    <script>
+    (function() {
+        const operators = [
+            { id: 'AND', label: 'AND (All)', type: 'logical' },
+            { id: 'OR', label: 'OR (Any)', type: 'logical' },
+            { id: 'NOT', label: 'NOT (Invert)', type: 'logical', argNames: ['Condition'] },
+            { id: '>', label: '>', type: 'comparison', argNames: ['Left', 'Right'] },
+            { id: '>=', label: '>=', type: 'comparison', argNames: ['Left', 'Right'] },
+            { id: '<', label: '<', type: 'comparison', argNames: ['Left', 'Right'] },
+            { id: '<=', label: '<=', type: 'comparison', argNames: ['Left', 'Right'] },
+            { id: '==', label: '==', type: 'comparison', argNames: ['Left', 'Right'] },
+            { id: '!=', label: '!=', type: 'comparison', argNames: ['Left', 'Right'] },
+            { id: 'current_value', label: 'Current Sensor Value', type: 'value' },
+            { id: 'constant', label: 'Constant Value', type: 'value' },
+            { id: 'aggregate', label: 'Aggregate (N records)', type: 'value', argNames: ['Window (N)', 'Function (sum/min/max)'] },
+            { id: 'time_aggregate', label: 'Aggregate (N minutes)', type: 'value', argNames: ['Window (min)', 'Function (sum/min/max)'] },
+            { id: '+', label: '+', type: 'math', argNames: ['Arg 1', 'Arg 2'] },
+            { id: '-', label: '-', type: 'math', argNames: ['Arg 1', 'Arg 2'] },
+            { id: '*', label: '*', type: 'math', argNames: ['Arg 1', 'Arg 2'] },
+            { id: '/', label: '/', type: 'math', argNames: ['Arg 1', 'Arg 2'] },
+        ];
+
+        const container = document.getElementById('cb-container-{{ name }}');
+        const hiddenInput = document.getElementById('cb-input-{{ name }}');
+
+        function createNode(data = null, isRoot = false, isFixed = false) {
+            if (!data || typeof data !== 'object') {
+                data = { op: 'constant', args: data || 0 };
+            }
+
+            const node = document.createElement('div');
+            node.className = 'cb-node';
+            
+            const row = document.createElement('div');
+            row.className = 'cb-row';
+            
+            const opSelect = document.createElement('select');
+            opSelect.className = 'cb-select';
+            operators.forEach(op => {
+                const opt = document.createElement('option');
+                opt.value = op.id;
+                opt.textContent = op.label;
+                if (data.op === op.id) opt.selected = true;
+                opSelect.appendChild(opt);
+            });
+            
+            row.appendChild(opSelect);
+
+            const childrenContainer = document.createElement('div');
+            childrenContainer.className = 'cb-children';
+
+            const updateFields = () => {
+                // Clear extra fields and children labels
+                const toRemove = row.querySelectorAll('.cb-extra');
+                toRemove.forEach(el => el.remove());
+                
+                const op = opSelect.value;
+                const opDef = operators.find(o => o.id === op);
+
+                if (op === 'constant') {
+                    const inp = document.createElement('input');
+                    inp.type = 'text';
+                    inp.className = 'cb-input cb-extra';
+                    inp.value = Array.isArray(data.args) ? (data.args[0] || 0) : (data.args ?? '');
+                    inp.style.width = '120px';
+                    inp.onchange = notifyChange;
+                    row.appendChild(inp);
+                    childrenContainer.style.display = 'none';
+                } else if (op === 'current_value') {
+                    childrenContainer.style.display = 'none';
+                } else {
+                    childrenContainer.style.display = 'flex';
+                    
+                    if (opDef.argNames) {
+                        // Ensure we have exactly N children
+                        const required = opDef.argNames.length;
+                        while(childrenContainer.children.length < required) {
+                            childrenContainer.appendChild(createArgWrapper(opDef.argNames[childrenContainer.children.length], { op: 'constant', args: 0 }, true));
+                        }
+                        while(childrenContainer.children.length > required) {
+                            childrenContainer.lastChild.remove();
+                        }
+                        // Update labels and ensure they are fixed
+                        Array.from(childrenContainer.children).forEach((child, i) => {
+                            child.querySelector('.cb-arg-label').textContent = opDef.argNames[i];
+                            // Re-init node if it wasn't fixed before or just hide its remove btn?
+                            // Actually createArgWrapper with true will handle it.
+                        });
+                    } else if (opDef.type === 'logical') {
+                        // Add button for variable logical ops
+                        const addBtn = document.createElement('button');
+                        addBtn.type = 'button';
+                        addBtn.className = 'cb-btn cb-btn-add cb-extra';
+                        addBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px">add</span> Add Condition';
+                        addBtn.onclick = () => {
+                            childrenContainer.appendChild(createArgWrapper('Arg', { op: 'constant', args: 0 }, false));
+                            notifyChange();
+                        };
+                        row.appendChild(addBtn);
+                    }
+                }
+            };
+
+            opSelect.onchange = () => {
+                // When changing op, we might want to preserve some args if they are similar,
+                // but for simplicity we'll just re-init based on the new op's requirements.
+                updateFields();
+                notifyChange();
+            };
+
+            if (!isRoot && !isFixed) {
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'cb-btn cb-btn-remove';
+                removeBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px">delete</span>';
+                removeBtn.onclick = () => {
+                    node.closest('.cb-arg-wrap').remove();
+                    notifyChange();
+                };
+                row.appendChild(removeBtn);
+            }
+
+            node.appendChild(row);
+            node.appendChild(childrenContainer);
+
+            // Init children from data
+            if (Array.isArray(data.args)) {
+                const opDef = operators.find(o => o.id === data.op);
+                data.args.forEach((arg, i) => {
+                    const label = (opDef && opDef.argNames && opDef.argNames[i]) ? opDef.argNames[i] : 'Arg';
+                    const isFixed = !!(opDef && opDef.argNames && opDef.argNames[i]);
+                    childrenContainer.appendChild(createArgWrapper(label, arg, isFixed));
+                });
+            }
+
+            updateFields();
+            
+            node.getData = () => {
+                const op = opSelect.value;
+                if (op === 'constant') {
+                    const inp = row.querySelector('.cb-input');
+                    const val = inp ? inp.value : 0;
+                    return { op: 'constant', args: isNaN(val) || val === '' ? val : parseFloat(val) };
+                }
+                if (op === 'current_value') {
+                    return { op: 'current_value' };
+                }
+                const args = Array.from(childrenContainer.children).map(c => c.querySelector('.cb-node').getData());
+                return { op, args };
+            };
+
+            return node;
+        }
+
+        function createArgWrapper(label, data, isFixed = false) {
+            const wrap = document.createElement('div');
+            wrap.className = 'cb-arg-wrap';
+            const lbl = document.createElement('span');
+            lbl.className = 'cb-arg-label';
+            lbl.textContent = label;
+            wrap.appendChild(lbl);
+            wrap.appendChild(createNode(data, false, isFixed));
+            return wrap;
+        }
+
+        function notifyChange() {
+            const rootNode = container.querySelector('.cb-node');
+            if (rootNode) {
+                hiddenInput.value = JSON.stringify(rootNode.getData());
+            }
+        }
+
+        // Initialize with data
+        let initialData = {};
+        try {
+            initialData = JSON.parse(hiddenInput.value);
+        } catch (e) {}
+
+        if (!initialData || Object.keys(initialData).length === 0) {
+            initialData = { op: 'AND', args: [] };
+        }
+
+        container.appendChild(createNode(initialData, true));
+
+    })();
+    </script>
+</div>

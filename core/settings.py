@@ -157,7 +157,7 @@ UNFOLD = {
                         "permission": lambda request: request.user.has_perm("severynsor.view_location"),
                     },
                     {
-                        "title": "Retreivers",
+                        "title": "Retrievers",
                         "icon": "download",
                         "link": reverse_lazy("admin:severynsor_sensorretriever_changelist"),
                         "permission": lambda request: request.user.has_perm("severynsor.view_sensorretriever"),
@@ -167,6 +167,13 @@ UNFOLD = {
                         "icon": "history",
                         "link": reverse_lazy("admin:severynsor_activitylog_changelist"),
                         "permission": lambda request: request.user.has_perm("severynsor.view_activitylog"),
+                    },
+                    {
+                        "title": "Alarms",
+                        "icon": "notifications_active",
+                        "link": lambda request: __import__("django.urls", fromlist=["reverse"]).reverse("admin:severynsor_alarm_changelist") + ("?state__exact=1" if request.user.is_authenticated and __import__("severynsor.models", fromlist=["Alarm"]).Alarm.objects.filter(user=request.user, state=True).exists() else ""),
+                        "permission": lambda request: request.user.has_perm("severynsor.view_alarm"),
+                        "badge": "severynsor.utils.get_active_alarms_badge",
                     },
                 ],
             },
@@ -213,3 +220,11 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'mailcatcher')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 1025))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '0').lower() in ('1', 'true', 'yes', 'on')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'alerts@severynsor.local')

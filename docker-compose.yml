@@ -23,6 +23,12 @@ services:
       - DJANGO_SETTINGS_MODULE=core.settings
     depends_on:
       - db
+  
+  mailcatcher:
+    image: sj26/mailcatcher
+    ports:
+      - "1080:1080"
+      - "1025:1025"
 
 volumes:
   postgres_data:

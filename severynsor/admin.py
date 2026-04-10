@@ -13,7 +13,9 @@ from unfold.datasets import BaseDataset
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 from .constants import MeasureType
-from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever, SystemDataRetriever, ActivityLog
+from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever, SystemDataRetriever, ActivityLog, Alarm
+from .widgets import ConditionBuilderWidget
+
 
 try:
     admin.site.unregister(User)
@@ -98,6 +100,24 @@ class MeasureTypeFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value():
             return queryset.instance_of(ValueSensor).filter(valuesensor__measure_type=self.value())
+        return queryset
+
+
+class AlarmStatusFilter(admin.SimpleListFilter):
+    title = 'Status'
+    parameter_name = 'state'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('1', 'Alarm ON'),
+            ('0', 'Alarm OFF'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == '1':
+            return queryset.filter(state=True)
+        if self.value() == '0':
+            return queryset.filter(state=False)
         return queryset
 
 
@@ -493,3 +513,94 @@ class ActivityLogAdmin(ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+@admin.register(Alarm)
+class AlarmAdmin(ModelAdmin):
+    list_display = ['title', 'sensor', 'sensor_value', 'status_badge', 'last_change', 'is_snoozed']
+    list_filter = [AlarmStatusFilter, 'sensor', 'send_email_when_on', 'send_email_when_off']
+    readonly_fields = ['status_display', 'last_change']
+    exclude = ['user', 'state']
+    
+    fieldsets = [
+        ('General', {
+            'fields': ['title', 'sensor', 'status_display', 'last_change'],
+            'classes': ['tab']
+        }),
+        ('Conditions', {
+            'fields': ['conditions'],
+            'classes': ['tab']
+        }),
+        ('Notifications', {
+            'fields': ['send_email_when_on', 'send_email_when_off', 'snooze_until'],
+            'classes': ['tab']
+        }),
+    ]
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = super().get_readonly_fields(request, obj)
+        if obj: # Editing an existing object
+            if 'sensor' not in fields:
+                fields = list(fields) + ['sensor']
+        return fields
+
+    @admin.display(description="Snoozed", boolean=True)
+    def is_snoozed(self, obj):
+        from django.utils import timezone
+        return obj.snooze_until and obj.snooze_until > timezone.now()
+    
+    @admin.display(description="Status")
+    def status_badge(self, obj):
+        return self.state_badge(obj)
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(user=request.user)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.user = request.user
+        super().save_model(request, obj, form, change)
+
+    def has_view_permission(self, request, obj=None):
+        if obj is not None and not request.user.is_superuser and obj.user != request.user:
+            return False
+        return super().has_view_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and not request.user.is_superuser and obj.user != request.user:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and not request.user.is_superuser and obj.user != request.user:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def state_badge(self, obj):
+        if obj.state:
+             return format_html(
+                '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs font-bold uppercase">ALARM ON</span>'
+            )
+        return format_html(
+            '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs font-bold uppercase">Alarm OFF</span>'
+        )
+
+    @admin.display(description="Current Status")
+    def status_display(self, obj):
+        return self.state_badge(obj)
+
+    @admin.display(description="Current Value")
+    def sensor_value(self, obj):
+        record = obj.sensor.records.order_by('-timestamp').first()
+        if record:
+            return record.display_value()
+        return "-"
+    state_badge.short_description = "State"
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'conditions':
+            kwargs['widget'] = ConditionBuilderWidget()
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
