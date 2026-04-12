@@ -24,6 +24,18 @@ services:
     depends_on:
       - db
   
+  worker:
+    build: .
+    command: python manage.py qcluster
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=core.settings
+    depends_on:
+      - db
+
   mailcatcher:
     image: sj26/mailcatcher
     ports:

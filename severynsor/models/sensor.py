@@ -26,6 +26,7 @@ class Sensor(PolymorphicModel):
         permissions = [
             ("can_view_token", "Can view and edit sensor token"),
             ("can_preview_sensor", "Can preview sensor data"),
+            ("view_summary", "Can view summary statistics"),
         ]
 
     def save(self, *args, **kwargs):

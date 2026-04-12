@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'channels',
     'rest_framework',
     'polymorphic',
+    'django_q',
     'severynsor',
 ]
 
@@ -176,6 +177,12 @@ UNFOLD = {
                         "permission": lambda request: request.user.has_perm("severynsor.view_alarm"),
                         "badge": "severynsor.utils.get_active_alarms_badge",
                     },
+                    {
+                        "title": "Summary Stats",
+                        "icon": "query_stats",
+                        "link": reverse_lazy("summary_stats"),
+                        "permission": lambda request: request.user.has_perm("severynsor.view_summary"),
+                    },
                 ],
             },
             {
@@ -229,3 +236,15 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', '0').lower() in ('1', 'true', 'yes', 'on')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'alerts@severynsor.local')
+
+Q_CLUSTER = {
+    'name': 'SeverynsorTasks',
+    'workers': 4,
+    'recycle': 500,
+    'timeout': 600,
+    'compress': True,
+    'save_limit': 250,
+    'queue_limit': 500,
+    'label': 'Django Q',
+    'orm': 'default'  # Use Django ORM as broker
+}

@@ -17,3 +17,4 @@ daphne
 av
 uvicorn
 optimize-images
+django-q2

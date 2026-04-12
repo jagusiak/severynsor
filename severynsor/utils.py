@@ -17,3 +17,18 @@ def get_active_alarms_badge(request):
     ).count()
     
     return str(count) if count > 0 else ""
+
+def get_media_size():
+    import os
+    from django.conf import settings
+    total_size = 0
+    start_path = settings.MEDIA_ROOT
+    if not os.path.exists(start_path):
+        return 0
+    for dirpath, dirnames, filenames in os.walk(start_path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            # skip if it is symbolic link
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+    return total_size

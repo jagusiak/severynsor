@@ -10,9 +10,11 @@ from severynsor.views import (
     dashboard_settings,
     dashboard_settings_save,
     sensor_toggle_dashboard,
+    summary_stats,
 )
 
 urlpatterns = [
+    path('summary/', summary_stats, name='summary_stats'),
     path('api/', include(('severynsor.urls', 'severynsor-api'), namespace='severynsor-api')),
     # Preview URLs at top level so they don't conflict with admin
     path('severynsor/valuesensor/<int:object_id>/preview/',

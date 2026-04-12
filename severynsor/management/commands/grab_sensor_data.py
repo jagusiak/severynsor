@@ -33,48 +33,19 @@ class Command(BaseCommand):
             self.lock_file.close()
 
     def _do_grab_data(self):
+        from django_q.tasks import async_task
+        from severynsor.tasks import grab_data_task
+
         retrievers = SensorRetriever.objects.all()
         count = 0
         self.stdout.write(self.style.NOTICE(f'Checking {retrievers.count()} retrievers...'))
         
         for retriever in retrievers:
             if retriever.should_run():
-                self.stdout.write(self.style.NOTICE(f'Retriever {retriever} should run. Grabbing data...'))
-                start_time = timezone.now()
-                try:
-                    retriever.grab_data()
-                    count += 1
-                    ActivityLog.objects.create(
-                        type=ActivityLog.RETRIEVER,
-                        sensor=retriever.sensor,
-                        retriever=retriever,
-                        success=True,
-                        timestamp=start_time,
-                        duration=(timezone.now() - start_time).total_seconds()
-                    )
-                except NotImplementedError:
-                    self.stdout.write(self.style.WARNING(f'Retriever {retriever} has not implemented grab_data().'))
-                    ActivityLog.objects.create(
-                        type=ActivityLog.RETRIEVER,
-                        sensor=retriever.sensor,
-                        retriever=retriever,
-                        success=False,
-                        error_message="Retriever has not implemented grab_data().",
-                        timestamp=start_time,
-                        duration=(timezone.now() - start_time).total_seconds()
-                    )
-                except Exception as e:
-                    self.stdout.write(self.style.ERROR(f'Error running retriever {retriever}: {e}'))
-                    ActivityLog.objects.create(
-                        type=ActivityLog.RETRIEVER,
-                        sensor=retriever.sensor,
-                        retriever=retriever,
-                        success=False,
-                        error_message=f"{str(e)}\n{traceback.format_exc()}",
-                        timestamp=start_time,
-                        duration=(timezone.now() - start_time).total_seconds()
-                    )
+                self.stdout.write(self.style.NOTICE(f'Retriever {retriever} should run. Scheduling async task...'))
+                async_task(grab_data_task, retriever.id)
+                count += 1
             else:
                 self.stdout.write(self.style.NOTICE(f'Retriever {retriever} skipped (already ran for this period).'))
         
-        self.stdout.write(self.style.SUCCESS(f'Successfully grabbed data for {count} retrievers.'))
+        self.stdout.write(self.style.SUCCESS(f'Successfully scheduled {count} tasks.'))

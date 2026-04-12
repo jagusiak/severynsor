@@ -376,3 +376,77 @@ def sensor_toggle_dashboard(request):
         return JsonResponse({'status': 'success'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@staff_member_required
+def summary_stats(request):
+    if not request.user.has_perm('severynsor.view_summary'):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+        
+    from django.contrib.auth.models import User
+    from .models.log import ActivityLog
+    from .models.alarm import Alarm
+    from .utils import get_media_size
+    
+    # Calculate stats
+    total_sensors = Sensor.objects.count()
+    active_sensors = Sensor.objects.filter(retrievers__enabled=True).distinct().count()
+    
+    total_records = Record.objects.count()
+    value_records = ValueRecord.objects.count()
+    image_records = ImageRecord.objects.count()
+    
+    total_retrievers = SensorRetriever.objects.count()
+    active_retrievers = SensorRetriever.objects.filter(enabled=True).count()
+    
+    media_size_bytes = get_media_size()
+    # Format media size
+    if media_size_bytes < 1024:
+        media_size = f"{media_size_bytes} B"
+    elif media_size_bytes < 1024**2:
+        media_size = f"{round(media_size_bytes / 1024, 2)} KB"
+    elif media_size_bytes < 1024**3:
+        media_size = f"{round(media_size_bytes / 1024**2, 2)} MB"
+    else:
+        media_size = f"{round(media_size_bytes / 1024**3, 2)} GB"
+        
+    total_logs = ActivityLog.objects.count()
+    total_failures = ActivityLog.objects.filter(success=False).count()
+    
+    total_alarms = Alarm.objects.count()
+    total_users = User.objects.count()
+    
+    context = {
+        **admin.site.each_context(request),
+        'title': 'System Summary',
+        'stats': {
+            'sensors': {
+                'total': total_sensors,
+                'active': active_sensors,
+            },
+            'retrievers': {
+                'total': total_retrievers,
+                'active': active_retrievers,
+            },
+            'records': {
+                'total': total_records,
+                'value': value_records,
+                'image': image_records,
+            },
+            'media': {
+                'size': media_size,
+            },
+            'logs': {
+                'total': total_logs,
+                'failures': total_failures,
+            },
+            'alarms': {
+                'total': total_alarms,
+            },
+            'users': {
+                'total': total_users,
+            }
+        }
+    }
+    return render(request, 'admin/severynsor/summary.html', context)
