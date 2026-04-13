@@ -177,12 +177,6 @@ UNFOLD = {
                         "permission": lambda request: request.user.has_perm("severynsor.view_alarm"),
                         "badge": "severynsor.utils.get_active_alarms_badge",
                     },
-                    {
-                        "title": "Summary Stats",
-                        "icon": "query_stats",
-                        "link": reverse_lazy("summary_stats"),
-                        "permission": lambda request: request.user.has_perm("severynsor.view_summary"),
-                    },
                 ],
             },
             {
@@ -219,6 +213,21 @@ UNFOLD = {
             "900": "oklch(17% 0.08 170)",
             "950": "oklch(12% 0.06 170)",
         },
+    },
+    "ACCOUNT": {
+        "navigation": [
+            {
+                "title": "System Management",
+                "link": reverse_lazy("system_view"),
+                "icon": "settings",
+                "permission": lambda request: request.user.has_perm("severynsor.view_summary"),
+            },
+            {
+                "title": "Password Change",
+                "link": reverse_lazy("admin:password_change"),
+                "icon": "password",
+            }
+        ],
     },
     "DASHBOARD_CALLBACK": "severynsor.dashboard.dashboard_callback",
 }

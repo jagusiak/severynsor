@@ -1,0 +1,665 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+    .stat-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.8rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        border: 1px solid #f3f4f6;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+    }
+    .dark .stat-card {
+        background: #111827;
+        border-color: #1f2937;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        border-color: #10b981;
+    }
+    .stat-icon {
+        width: 3.5rem;
+        height: 3.5rem;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+        transition: transform 0.3s ease;
+    }
+    .stat-card:hover .stat-icon {
+        transform: scale(1.1) rotate(5deg);
+    }
+    .stat-icon span {
+        font-size: 2rem;
+    }
+    .stat-value {
+        font-size: 2.25rem;
+        font-weight: 800;
+        color: #111827;
+        line-height: 1;
+        letter-spacing: -0.025em;
+    }
+    .dark .stat-value {
+        color: #f9fafb;
+    }
+    .stat-label {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #4b5563;
+        margin-top: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .dark .stat-label {
+        color: #9ca3af;
+    }
+    .stat-sub {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.75rem;
+        padding-top: 0.75rem;
+        border-top: 1px solid #f3f4f6;
+    }
+    .dark .stat-sub {
+        color: #9ca3af;
+        border-top-color: #1f2937;
+    }
+    
+    .bg-emerald-soft { background-color: #ecfdf5; color: #059669; }
+    .dark .bg-emerald-soft { background-color: rgba(16, 185, 129, 0.1); color: #34d399; }
+    
+    .bg-blue-soft { background-color: #eff6ff; color: #2563eb; }
+    .dark .bg-blue-soft { background-color: rgba(59, 130, 246, 0.1); color: #60a5fa; }
+    
+    .bg-indigo-soft { background-color: #eef2ff; color: #4f46e5; }
+    .dark .bg-indigo-soft { background-color: rgba(99, 102, 241, 0.1); color: #818cf8; }
+    
+    .bg-amber-soft { background-color: #fffbeb; color: #d97706; }
+    .dark .bg-amber-soft { background-color: rgba(245, 158, 11, 0.1); color: #fbbf24; }
+    
+    .bg-rose-soft { background-color: #fff1f2; color: #e11d48; }
+    .dark .bg-rose-soft { background-color: rgba(244, 63, 94, 0.1); color: #fb7185; }
+    
+    .bg-cyan-soft { background-color: #ecfeff; color: #0891b2; }
+    .dark .bg-cyan-soft { background-color: rgba(6, 182, 212, 0.1); color: #22d3ee; }
+    
+    .bg-violet-soft { background-color: #f5f3ff; color: #7c3aed; }
+    .dark .bg-violet-soft { background-color: rgba(139, 92, 246, 0.1); color: #a78bfa; }
+    
+    .bg-teal-soft { background-color: #f0fdfa; color: #0d9488; }
+    .dark .bg-teal-soft { background-color: rgba(20, 184, 166, 0.1); color: #2dd4bf; }
+
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: -2rem;
+        right: -2rem;
+        width: 8rem;
+        height: 8rem;
+        background: currentColor;
+        opacity: 0.03;
+        border-radius: 50%;
+        pointer-events: none;
+    }
+
+    .maintenance-section {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+    }
+    .maintenance-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+        gap: 1.5rem;
+    }
+    .maintenance-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        border: 1px solid #f3f4f6;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .dark .maintenance-card {
+        background: #111827;
+        border-color: #1f2937;
+    }
+    .maintenance-info h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+    .maintenance-info p {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    .dark .maintenance-info p {
+        color: #9ca3af;
+    }
+    .maintenance-actions {
+        margin-top: auto;
+        display: flex;
+        justify-content: flex-end;
+    }
+    .btn-maintenance {
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+        border: 1px solid transparent;
+    }
+    .btn-primary-soft {
+        background: #ecfdf5;
+        color: #059669;
+    }
+    .dark .btn-primary-soft {
+        background: rgba(16, 185, 129, 0.1);
+        color: #34d399;
+    }
+    .btn-primary-soft:hover:not(:disabled) {
+        background: #10b981;
+        color: white;
+    }
+    .btn-danger-soft {
+        background: #fff1f2;
+        color: #e11d48;
+    }
+    .dark .btn-danger-soft {
+        background: rgba(244, 63, 94, 0.1);
+        color: #fb7185;
+    }
+    .btn-danger-soft:hover:not(:disabled) {
+        background: #e11d48;
+        color: white;
+    }
+    
+    .backup-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 1rem;
+    }
+    .backup-table th {
+        text-align: left;
+        padding: 0.75rem 1rem;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #6b7280;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .dark .backup-table th {
+        color: #9ca3af;
+        border-bottom-color: #1f2937;
+    }
+    .backup-table td {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .dark .backup-table td {
+        border-bottom-color: #1f2937;
+    }
+    
+    .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    .dark .modal-content {
+        background: #1f2937;
+    }
+    
+    .btn-confirm {
+        background-color: #10b981;
+        color: white;
+        padding: 0.625rem 1.5rem;
+        border-radius: 0.375rem;
+        font-weight: 600;
+        transition: all 0.2s;
+        border: none;
+        cursor: pointer;
+    }
+    .btn-confirm:hover:not(:disabled) {
+        background-color: #059669;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    }
+    .btn-confirm:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .btn-cancel {
+        background-color: transparent;
+        color: #6b7280;
+        padding: 0.625rem 1.5rem;
+        border-radius: 0.375rem;
+        font-weight: 500;
+        transition: all 0.2s;
+        border: 1px solid #e5e7eb;
+        cursor: pointer;
+    }
+    .dark .btn-cancel {
+        color: #9ca3af;
+        border-color: #374151;
+    }
+    .btn-cancel:hover {
+        background-color: #f9fafb;
+        color: #111827;
+        border-color: #d1d5db;
+    }
+    .dark .btn-cancel:hover {
+        background-color: #1f2937;
+        color: white;
+        border-color: #4b5563;
+    }
+    
+    .action-link {
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        transition: opacity 0.2s;
+    }
+    .action-link:hover {
+        opacity: 0.8;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="px-4 py-3 sm:px-6 lg:px-8 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm relative z-10">
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol role="list" class="flex items-center space-x-4">
+            <li>
+                <div>
+                    <a href="{% url 'admin:index' %}" class="text-gray-400 hover:text-gray-500">
+                        <span class="material-symbols-outlined text-xl">home</span>
+                    </a>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center">
+                    <span class="material-symbols-outlined text-gray-400">chevron_right</span>
+                    <span class="ml-4 text-sm font-medium text-gray-700 dark:text-gray-200" aria-current="page">System</span>
+                </div>
+            </li>
+        </ol>
+    </nav>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 sm:px-6 lg:px-8 pt-6">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">System Management</h1>
+            <p class="text-gray-500 dark:text-gray-400">Administrative tools, health statistics, and data maintenance.</p>
+        </div>
+
+        <!-- Navigation Tabs (Unfold Style) -->
+        <nav id="system-tabs"
+            class="bg-base-100 flex flex-row font-medium gap-1 p-1 rounded-default text-important md:w-auto *:flex *:flex-row *:gap-1 *:font-medium *:whitespace-nowrap *:items-center *:px-2.5 *:py-[5px] *:rounded-default *:hover:bg-base-700/[.06] dark:bg-white/[.06] *:dark:hover:bg-white/[.06] [&>.active]:bg-white [&>.active]:shadow-xs [&>.active]:dark:bg-base-700 [&>.active]:hover:bg-white [&>.active]:dark:hover:bg-base-700 overflow-x-auto">
+            <button onclick="switchTab('stats')" id="tab-btn-stats" class="active">Stats</button>
+            <button onclick="switchTab('tools')" id="tab-btn-tools">Tools</button>
+        </nav>
+    </div>
+</div>
+
+<!-- Tab Content: Stats -->
+<div id="tab-content-stats" class="px-4 sm:px-6 lg:px-8">
+    <div class="summary-grid">
+        <!-- Sensors Card -->
+        <div class="stat-card" style="color: #10b981;">
+            <div class="stat-icon bg-emerald-soft">
+                <span class="material-symbols-outlined">sensors</span>
+            </div>
+            <div class="stat-value">{{ stats.sensors.total }}</div>
+            <div class="stat-label">Sensors</div>
+            <div class="stat-sub">
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs">
+                        <span>Value Sensors</span>
+                        <span class="font-semibold">{{ stats.sensors.value }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span>Image Sensors</span>
+                        <span class="font-semibold">{{ stats.sensors.image }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Retrievers Card -->
+        <div class="stat-card" style="color: #8b5cf6;">
+            <div class="stat-icon bg-violet-soft">
+                <span class="material-symbols-outlined">download</span>
+            </div>
+            <div class="stat-value">{{ stats.retrievers.total }}</div>
+            <div class="stat-label">Retrievers</div>
+            <div class="stat-sub">
+                <div class="flex justify-between items-center text-violet-600 dark:text-violet-400">
+                    <span>Active</span>
+                    <span class="font-bold border-b border-violet-200 dark:border-violet-900">{{ stats.retrievers.active }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Records Card -->
+        <div class="stat-card" style="color: #3b82f6;">
+            <div class="stat-icon bg-blue-soft">
+                <span class="material-symbols-outlined">database</span>
+            </div>
+            <div class="stat-value">{{ stats.records.total }}</div>
+            <div class="stat-label">Total Records</div>
+            <div class="stat-sub">
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs">
+                        <span>Value Records</span>
+                        <span class="font-semibold">{{ stats.records.value }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span>Image Records</span>
+                        <span class="font-semibold">{{ stats.records.image }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Media Card -->
+        <div class="stat-card" style="color: #4f46e5;">
+            <div class="stat-icon bg-indigo-soft">
+                <span class="material-symbols-outlined">perm_media</span>
+            </div>
+            <div class="stat-value">{{ stats.media.size }}</div>
+            <div class="stat-label">Media Assets</div>
+            <div class="stat-sub">Disk space used by sensor images</div>
+        </div>
+
+        <!-- Activity Card -->
+        <div class="stat-card" style="color: #f59e0b;">
+            <div class="stat-icon bg-amber-soft">
+                <span class="material-symbols-outlined">history</span>
+            </div>
+            <div class="stat-value">{{ stats.logs.total }}</div>
+            <div class="stat-label">Activity Logs</div>
+            <div class="stat-sub">
+                <div class="flex justify-between items-center text-rose-600 dark:text-rose-400">
+                    <span>Failures</span>
+                    <span class="font-bold border-b border-rose-200 dark:border-rose-900">{{ stats.logs.failures }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alarms Card -->
+        <div class="stat-card" style="color: #f43f5e;">
+            <div class="stat-icon bg-rose-soft">
+                <span class="material-symbols-outlined">notification_important</span>
+            </div>
+            <div class="stat-value">{{ stats.alarms.total }}</div>
+            <div class="stat-label">Configured Alarms</div>
+            <div class="stat-sub">Active monitoring conditions</div>
+        </div>
+
+        <!-- Tasks Card -->
+        <div class="stat-card" style="color: #0d9488;">
+            <div class="stat-icon bg-teal-soft">
+                <span class="material-symbols-outlined">task</span>
+            </div>
+            <div class="stat-value">{{ stats.tasks.done }}</div>
+            <div class="stat-label">Tasks Finished</div>
+            <div class="stat-sub">
+                <div class="flex flex-col gap-1">
+                    <div class="flex justify-between text-xs">
+                        <span>In Progress / Queued</span>
+                        <span class="font-semibold">{{ stats.tasks.queued }}</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-rose-600 dark:text-rose-400">
+                        <span>Failed</span>
+                        <span class="font-semibold">{{ stats.tasks.failed }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Users Card -->
+        <div class="stat-card" style="color: #06b6d4;">
+            <div class="stat-icon bg-cyan-soft">
+                <span class="material-symbols-outlined">group</span>
+            </div>
+            <div class="stat-value">{{ stats.users.total }}</div>
+            <div class="stat-label">System Users</div>
+            <div class="stat-sub">Authorized administrators</div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab Content: Tools -->
+<div id="tab-content-tools" class="px-4 sm:px-6 lg:px-8 hidden">
+    <div class="maintenance-section">
+        <div class="maintenance-grid">
+            <!-- Cleanup Operations -->
+            <div class="maintenance-card">
+                <div class="maintenance-info">
+                    <h3>Minimize Value Logs</h3>
+                    <p>Reduces database size by removing redundant sensor readings. Analyses 1-hour windows and keeps only border values of identical sequences.</p>
+                </div>
+                <div class="maintenance-actions">
+                    <button onclick="confirmTask('minimize_value_logs', 'Minimize Value Logs')" class="btn-maintenance btn-primary-soft">
+                        <span class="material-symbols-outlined text-sm">compress</span>
+                        Run Cleanup
+                    </button>
+                </div>
+            </div>
+
+            <div class="maintenance-card">
+                <div class="maintenance-info">
+                    <h3>Compress Image Logs</h3>
+                    <p>Consolidates image records older than 1 month. Keeps one image per hour per sensor, deleting intermediate captures.</p>
+                </div>
+                <div class="maintenance-actions">
+                    <button onclick="confirmTask('compress_image_logs', 'Compress Image Logs')" class="btn-maintenance btn-primary-soft">
+                        <span class="material-symbols-outlined text-sm">photo_library</span>
+                        Run Cleanup
+                    </button>
+                </div>
+            </div>
+
+            <div class="maintenance-card">
+                <div class="maintenance-info">
+                    <h3>Purge Historical Data (>1 Year)</h3>
+                    <p>Permanent removal of all value and image records older than 365 days. Optimal for system longevity and performance.</p>
+                </div>
+                <div class="maintenance-actions flex gap-2">
+                    <button onclick="confirmTask('remove_old_value_entries', 'Purge Value Logs (>1y)')" class="btn-maintenance btn-danger-soft">
+                        Purge Values
+                    </button>
+                    <button onclick="confirmTask('remove_old_image_entries', 'Purge Image Logs (>1y)')" class="btn-maintenance btn-danger-soft">
+                        Purge Images
+                    </button>
+                </div>
+            </div>
+
+            <!-- Backup Operations -->
+            <div class="maintenance-card border-indigo-200 dark:border-indigo-900 bg-indigo-50/30 dark:bg-indigo-900/10">
+                <div class="maintenance-info">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="material-symbols-outlined text-indigo-500">backup</span>
+                        <h3 class="text-indigo-900 dark:text-indigo-300">System Backups</h3>
+                    </div>
+                    <p>Full snapshot of database and media files. Super-user privilege required for creation and restoration.</p>
+                </div>
+                <div class="maintenance-actions flex gap-2">
+                    <button onclick="confirmTask('cleanup_backups', 'Cleanup Old Backups')" class="btn-maintenance border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800">
+                        Keep Latest Only
+                    </button>
+                    {% if is_superuser or user.is_superuser %}
+                    <button onclick="confirmTask('create_backup', 'Create Full System Backup')" class="btn-maintenance btn-confirm">
+                        <span class="material-symbols-outlined text-sm">add_circle</span>
+                        Create Backup
+                    </button>
+                    {% endif %}
+                </div>
+
+                {% if backups %}
+                <div class="mt-4 border-t border-indigo-100 dark:border-indigo-900 pt-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-500 mb-2">Recent Backups</h4>
+                    <div class="overflow-x-auto">
+                        <table class="backup-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Size</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for backup in backups %}
+                                <tr>
+                                    <td class="whitespace-nowrap">{{ backup.date|date:"Y-m-d H:i" }}</td>
+                                    <td>{{ backup.size }}</td>
+                                    <td>
+                                        <div class="flex gap-4 items-center">
+                                            <a href="{% url 'download_backup' backup.name %}" class="action-link text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
+                                                <span class="material-symbols-outlined text-sm">download</span>
+                                                Get
+                                            </a>
+                                            {% if is_superuser or user.is_superuser %}
+                                            <button onclick="confirmTask('restore_backup', 'Restore System Backup', '{{ backup.name }}')" class="action-link text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 border-none bg-transparent p-0">
+                                                <span class="material-symbols-outlined text-sm">settings_backup_restore</span>
+                                                Restore
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="mt-4 text-center py-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm text-gray-500">
+                    No backups found.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-backdrop">
+    <div class="modal-content">
+        <h2 id="modalTitle" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Confirm Operation</h2>
+        <p id="modalBody" class="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed"></p>
+        <div class="flex justify-end gap-3 mt-6">
+            <button onclick="closeModal()" class="btn-cancel">Cancel</button>
+            <button id="confirmBtn" class="btn-confirm">Confirm & Run</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchTab(tabId) {
+        // Toggle Buttons logic matching dashboard style
+        document.querySelectorAll('#system-tabs button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        
+        const activeBtn = document.getElementById('tab-btn-' + tabId);
+        activeBtn.classList.add('active');
+
+        // Toggle Content
+        document.getElementById('tab-content-stats').classList.toggle('hidden', tabId !== 'stats');
+        document.getElementById('tab-content-tools').classList.toggle('hidden', tabId !== 'tools');
+    }
+
+    let currentTask = null;
+    let currentBackupName = null;
+
+    function confirmTask(type, title, backupName = null) {
+        currentTask = type;
+        currentBackupName = backupName;
+        const modal = document.getElementById('confirmModal');
+        const titleEl = document.getElementById('modalTitle');
+        const bodyEl = document.getElementById('modalBody');
+        
+        const descriptions = {
+            'minimize_value_logs': 'This will remove redundant sensor readings by keeping only border values in 1h windows.',
+            'compress_image_logs': 'Consolidates image records older than 1 month to one per hour.',
+            'remove_old_value_entries': 'DANGER: All value records older than 1 year will be permanently deleted.',
+            'remove_old_image_entries': 'DANGER: All image records older than 1 year will be permanently deleted.',
+            'cleanup_backups': 'Keep only the latest backup.',
+            'create_backup': 'Full snapshot of database and media files.',
+            'restore_backup': 'CRITICAL WARNING: This will PERMANENTLY DELETE current data and replace it from backup. Destructive!'
+        };
+
+        titleEl.innerText = title;
+        bodyEl.innerText = descriptions[type] || 'Are you sure?';
+        document.getElementById('confirmBtn').onclick = runTask;
+        modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('confirmModal').style.display = 'none';
+        currentTask = null;
+    }
+
+    async function runTask() {
+        if (!currentTask) return;
+        const btn = document.getElementById('confirmBtn');
+        btn.disabled = true;
+        btn.innerText = 'Scheduling...';
+
+        try {
+            const response = await fetch('{% url "trigger_maintenance_task" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ task_type: currentTask, backup_name: currentBackupName })
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                alert('Task scheduled: ' + data.message);
+                closeModal();
+                if (['create_backup', 'cleanup_backups', 'restore_backup'].includes(currentTask)) location.reload();
+            } else alert('Error: ' + data.message);
+        } catch (error) { alert('Failed: ' + error); }
+        finally { btn.disabled = false; btn.innerText = 'Confirm & Run'; }
+    }
+</script>
+{% endblock %}

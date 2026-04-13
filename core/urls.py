@@ -10,11 +10,14 @@ from severynsor.views import (
     dashboard_settings,
     dashboard_settings_save,
     sensor_toggle_dashboard,
-    summary_stats,
+    sensor_toggle_dashboard,
+    system_view,
+    trigger_maintenance_task,
+    download_backup,
 )
 
 urlpatterns = [
-    path('summary/', summary_stats, name='summary_stats'),
+    path('system/', system_view, name='system_view'),
     path('api/', include(('severynsor.urls', 'severynsor-api'), namespace='severynsor-api')),
     # Preview URLs at top level so they don't conflict with admin
     path('severynsor/valuesensor/<int:object_id>/preview/',
@@ -38,6 +41,8 @@ urlpatterns = [
     path('dashboard-settings/toggle-sensor/',
          sensor_toggle_dashboard,
          name='sensor_toggle_dashboard'),
+    path('system/maintenance/', trigger_maintenance_task, name='trigger_maintenance_task'),
+    path('system/backup/download/<str:filename>/', download_backup, name='download_backup'),
     path('', admin.site.urls),
 ]
 

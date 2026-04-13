@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #f3f4f6;
+        padding: 40px 20px;
+        margin: 0;
+    }
+    .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+    }
+    .header {
+        padding: 32px;
+        text-align: center;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    .status-icon {
+        font-size: 48px;
+        margin-bottom: 16px;
+    }
+    .content {
+        padding: 32px;
+        line-height: 1.6;
+        color: #374151;
+    }
+    .bubble {
+        background-color: #f9fafb;
+        border-radius: 12px;
+        padding: 24px;
+        margin: 20px 0;
+        border: 1px solid #e5e7eb;
+    }
+    .footer {
+        padding: 24px;
+        text-align: center;
+        font-size: 13px;
+        color: #6b7280;
+        background-color: #f9fafb;
+    }
+    .button {
+        display: inline-block;
+        padding: 12px 24px;
+        background-color: #10b981;
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        margin-top: 16px;
+    }
+    .status-success { color: #059669; }
+    .status-failure { color: #dc2626; }
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="status-icon">{% if success %}💎{% else %}⚠️{% endif %}</div>
+            <h2 style="margin: 0; color: #111827;">System Task Notification</h2>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+            
+            <p>The system task <strong>{{ task_name }}</strong> has completed.</p>
+
+            <div class="bubble">
+                <strong>Status:</strong> 
+                <span class="{% if success %}status-success{% else %}status-failure{% endif %}">
+                    {% if success %}SUCCESS{% else %}FAILURE{% endif %}
+                </span>
+                <br>
+                <strong>Timestamp:</strong> {{ timestamp|date:"Y-m-d H:i:s" }}
+                
+                {% if details %}
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb; white-space: pre-wrap; font-size: 14px; color: #4b5563;">
+                    {{ details }}
+                </div>
+                {% endif %}
+            </div>
+
+            <p>
+                You can review the system summary and statistics in the admin panel.
+            </p>
+            
+            <a href="{{ summary_url }}" class="button">Go to Dashboard</a>
+        </div>
+        <div class="footer">
+            Sent by Severynsor System Maintenance
+        </div>
+    </div>
+</body>
+</html>

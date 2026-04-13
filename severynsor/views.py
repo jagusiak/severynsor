@@ -1,23 +1,27 @@
 import json
+import os
 from datetime import timedelta
+
+from django.conf import settings
 
 from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import permission_required
 from django.db.models import Avg, Min, Max
 from django.db.models.functions import TruncMinute, TruncHour, TruncDay, TruncWeek
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.http import JsonResponse, HttpResponse, FileResponse, Http404
+from django.shortcuts import get_object_or_404, render, redirect
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views import View
 from rest_framework import generics
 from rest_framework.permissions import BasePermission
 
+from django.contrib.auth.models import User
 from .authentication import BearerSensorAuthentication
 from .models import (
     Location, Sensor, Record, ValueSensor, ImageSensor, ValueRecord, ImageRecord,
-    SensorRetriever, RTSPRetriever,
+    SensorRetriever, RTSPRetriever, ActivityLog, Alarm
 )
 from .serializers import RecordSerializer
 
@@ -379,19 +383,15 @@ def sensor_toggle_dashboard(request):
 
 
 @staff_member_required
-def summary_stats(request):
+def system_view(request):
     if not request.user.has_perm('severynsor.view_summary'):
-        from django.core.exceptions import PermissionDenied
-        raise PermissionDenied
-        
-    from django.contrib.auth.models import User
-    from .models.log import ActivityLog
-    from .models.alarm import Alarm
-    from .utils import get_media_size
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("You don't have permission to view system statistics.")
     
     # Calculate stats
     total_sensors = Sensor.objects.count()
-    active_sensors = Sensor.objects.filter(retrievers__enabled=True).distinct().count()
+    value_sensors = ValueSensor.objects.count()
+    image_sensors = ImageSensor.objects.count()
     
     total_records = Record.objects.count()
     value_records = ValueRecord.objects.count()
@@ -400,8 +400,17 @@ def summary_stats(request):
     total_retrievers = SensorRetriever.objects.count()
     active_retrievers = SensorRetriever.objects.filter(enabled=True).count()
     
+    def get_media_size():
+        total_size = 0
+        media_root = settings.MEDIA_ROOT
+        if os.path.exists(media_root):
+            for root, dirs, files in os.walk(media_root):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    total_size += os.path.getsize(fp)
+        return total_size
+
     media_size_bytes = get_media_size()
-    # Format media size
     if media_size_bytes < 1024:
         media_size = f"{media_size_bytes} B"
     elif media_size_bytes < 1024**2:
@@ -413,17 +422,39 @@ def summary_stats(request):
         
     total_logs = ActivityLog.objects.count()
     total_failures = ActivityLog.objects.filter(success=False).count()
-    
     total_alarms = Alarm.objects.count()
     total_users = User.objects.count()
     
+    from django_q.models import Success, Failure, OrmQ
+    tasks_done = Success.objects.count()
+    tasks_failed = Failure.objects.count()
+    tasks_queued = OrmQ.objects.count()
+
+    # Refresh backup list
+    backup_dir = os.path.join(settings.BASE_DIR, 'backups')
+    backups = []
+    if os.path.exists(backup_dir):
+        for f in os.listdir(backup_dir):
+            if f.startswith('backup_') and f.endswith('.zip'):
+                fpath = os.path.join(backup_dir, f)
+                stats = os.stat(fpath)
+                backups.append({
+                    'name': f,
+                    'size': f"{round(stats.st_size / (1024 * 1024), 2)} MB",
+                    'date': timezone.datetime.fromtimestamp(stats.st_mtime)
+                })
+    
+    # Sort backups by date dec
+    backups.sort(key=lambda x: x['date'], reverse=True)
+
     context = {
         **admin.site.each_context(request),
-        'title': 'System Summary',
+        'title': 'System Statistics & Maintenance',
         'stats': {
             'sensors': {
                 'total': total_sensors,
-                'active': active_sensors,
+                'value': value_sensors,
+                'image': image_sensors,
             },
             'retrievers': {
                 'total': total_retrievers,
@@ -433,6 +464,11 @@ def summary_stats(request):
                 'total': total_records,
                 'value': value_records,
                 'image': image_records,
+            },
+            'tasks': {
+                'done': tasks_done,
+                'failed': tasks_failed,
+                'queued': tasks_queued,
             },
             'media': {
                 'size': media_size,
@@ -447,6 +483,84 @@ def summary_stats(request):
             'users': {
                 'total': total_users,
             }
-        }
+        },
+        'backups': backups,
+        'is_superuser': request.user.is_superuser,
+        'user': request.user,
     }
-    return render(request, 'admin/severynsor/summary.html', context)
+    return render(request, 'admin/severynsor/system.html', context)
+
+
+@staff_member_required
+def trigger_maintenance_task(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+    
+    if not request.user.has_perm('severynsor.view_summary'):
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+        
+    import json
+    try:
+        data = json.loads(request.body)
+        task_type = data.get('task_type')
+        user_email = request.user.email
+        
+        if not user_email:
+            return JsonResponse({'status': 'error', 'message': 'User email required for notifications'}, status=400)
+            
+        from django_q.tasks import async_task
+        from .tasks import (
+            cleanup_value_logs, cleanup_image_logs, 
+            remove_old_value_entries, remove_old_image_entries,
+            cleanup_backups_task, create_backup_task, restore_backup_task
+        )
+        
+        backup_name = data.get('backup_name')
+
+        if task_type == 'minimize_value_logs':
+            async_task(cleanup_value_logs, user_email)
+        elif task_type == 'compress_image_logs':
+            async_task(cleanup_image_logs, user_email)
+        elif task_type == 'remove_old_value_entries':
+            async_task(remove_old_value_entries, user_email)
+        elif task_type == 'remove_old_image_entries':
+            async_task(remove_old_image_entries, user_email)
+        elif task_type == 'cleanup_backups':
+            async_task(cleanup_backups_task, user_email)
+        elif task_type == 'create_backup':
+            if not request.user.is_superuser:
+                 return JsonResponse({'status': 'error', 'message': 'Superuser privilege required for backup'}, status=403)
+            async_task(create_backup_task, user_email)
+        elif task_type == 'restore_backup':
+            if not request.user.is_superuser:
+                 return JsonResponse({'status': 'error', 'message': 'Superuser privilege required for restore'}, status=403)
+            if not backup_name:
+                return JsonResponse({'status': 'error', 'message': 'Backup name is required for restore'}, status=400)
+            async_task(restore_backup_task, user_email, backup_name)
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Unknown task type'}, status=400)
+            
+        return JsonResponse({'status': 'success', 'message': 'Task scheduled. You will receive an email upon completion.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@staff_member_required
+def download_backup(request, filename):
+    if not request.user.is_superuser:
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+
+    import os
+    from django.conf import settings
+    backup_dir = os.path.join(settings.BASE_DIR, 'backups')
+    file_path = os.path.join(backup_dir, filename)
+    
+    # Security check: ensure path is within backup_dir and file exists
+    if not os.path.abspath(file_path).startswith(os.path.abspath(backup_dir)):
+        raise Http404("Invalid file path")
+        
+    if not os.path.exists(file_path):
+        raise Http404("File not found")
+        
+    return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)

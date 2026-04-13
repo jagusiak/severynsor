@@ -119,6 +119,8 @@ class Alarm(models.Model):
 
 @receiver(post_save, sender='severynsor.ValueRecord')
 def trigger_alarm_recalculation(sender, instance, created, **kwargs):
+    if kwargs.get('raw'):
+        return
     if created:
         alarms = Alarm.objects.filter(sensor=instance.sensor)
         for alarm in alarms:
