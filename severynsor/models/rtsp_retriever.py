@@ -5,11 +5,12 @@ from django.utils import timezone
 from django.core.files.base import ContentFile
 from .sensor_retriever import SensorRetriever
 from .record import ImageRecord
+from ..db_fields import EncryptedCharField
 
 logger = logging.getLogger(__name__)
 
 class RTSPRetriever(SensorRetriever):
-    rtsp_url = models.CharField(max_length=255)
+    rtsp_url = EncryptedCharField(max_length=512)
 
     retriever_name = 'RTSP Retriever'
     

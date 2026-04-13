@@ -7,9 +7,14 @@ from django.utils.safestring import mark_safe
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
+from django.forms import PasswordInput
 from unfold.admin import ModelAdmin
 from unfold.decorators import action
-from unfold.datasets import BaseDataset
+try:
+    from unfold.datasets import BaseDataset
+except ImportError:
+    class BaseDataset:
+        pass
 from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 from .constants import MeasureType
@@ -385,6 +390,11 @@ class OpenWeatherMapRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
             ro.append('sensor')
         return ro
 
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'api_key':
+            kwargs['widget'] = PasswordInput(render_value=True)
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
 @admin.register(RTSPRetriever)
 class RTSPRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
     base_model = SensorRetriever
@@ -396,6 +406,11 @@ class RTSPRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
         if obj and 'sensor' not in ro:
             ro.append('sensor')
         return ro
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'rtsp_url':
+            kwargs['widget'] = PasswordInput(render_value=True)
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 @admin.register(SystemDataRetriever)
 class SystemDataRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):

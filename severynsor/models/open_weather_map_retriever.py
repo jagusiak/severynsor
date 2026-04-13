@@ -3,9 +3,10 @@ from django.db import models
 from django.utils import timezone
 from .sensor_retriever import SensorRetriever
 from .record import ValueRecord
+from ..db_fields import EncryptedCharField
 
 class OpenWeatherMapRetriever(SensorRetriever):
-    api_key = models.CharField(max_length=255)
+    api_key = EncryptedCharField(max_length=512)
     retriever_name = 'Open Weather Map'
     
     @classmethod
