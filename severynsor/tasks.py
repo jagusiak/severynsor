@@ -235,14 +235,33 @@ def create_backup_task(user_email):
         db_dump_path = os.path.join(backup_dir, f"db_dump_{timestamp}.json")
         
         # Dump DB using manage.py dumpdata
-        # Note: In a production environment with Docker, you might need to specify the path to python/manage.py
+        # We use sys.executable to ensure we use the same venv/path as the current process
+        import sys
+        
+        dump_cmd = [
+            sys.executable, 'manage.py', 'dumpdata',
+            '--exclude', 'contenttypes',
+            '--exclude', 'auth.Permission',
+            '--exclude', 'admin.LogEntry',
+            '--exclude', 'sessions.Session',
+            '--exclude', 'django_q',
+            '--natural-foreign',
+            '--natural-primary',
+            '--indent', '2'
+        ]
+        
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
         try:
-            with open(db_dump_path, 'w') as f:
-                subprocess.run(['python', 'manage.py', 'dumpdata', '--exclude', 'contenttypes', '--exclude', 'auth.Permission', '--indent', '2'], stdout=f, check=True)
+            with open(db_dump_path, 'w', encoding='utf-8') as f:
+                result = subprocess.run(dump_cmd, stdout=f, stderr=subprocess.PIPE, text=True, env=env)
+                if result.returncode != 0:
+                    raise Exception(f"dumpdata failed: {result.stderr}")
         except Exception as dump_err:
-             # Fallback to python3 if python is not available
-             with open(db_dump_path, 'w') as f:
-                subprocess.run(['python3', 'manage.py', 'dumpdata', '--exclude', 'contenttypes', '--exclude', 'auth.Permission', '--indent', '2'], stdout=f, check=True)
+            if os.path.exists(db_dump_path):
+                os.remove(db_dump_path)
+            raise dump_err
             
         # Create Zip
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -294,17 +313,19 @@ def restore_backup_task(user_email, backup_name):
         dump_path = os.path.join(temp_dir, dump_files[0])
         
         # 3. Flush Database (Destructive!)
-        # We use --no-input to avoid interactive prompt
-        try:
-            subprocess.run(['python', 'manage.py', 'flush', '--no-input'], check=True)
-        except:
-            subprocess.run(['python3', 'manage.py', 'flush', '--no-input'], check=True)
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
+        flush_result = subprocess.run([sys.executable, 'manage.py', 'flush', '--no-input'], 
+                                       stderr=subprocess.PIPE, text=True, env=env)
+        if flush_result.returncode != 0:
+            raise Exception(f"Database flush failed: {flush_result.stderr}")
 
         # 4. Load Data
-        try:
-            subprocess.run(['python', 'manage.py', 'loaddata', dump_path], check=True)
-        except:
-            subprocess.run(['python3', 'manage.py', 'loaddata', dump_path], check=True)
+        load_result = subprocess.run([sys.executable, 'manage.py', 'loaddata', dump_path], 
+                                      stderr=subprocess.PIPE, text=True, env=env)
+        if load_result.returncode != 0:
+            raise Exception(f"loaddata failed: {load_result.stderr}")
 
         # 5. Restore Media
         extracted_media = os.path.join(temp_dir, 'media')
