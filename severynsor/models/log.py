@@ -32,6 +32,14 @@ class ActivityLog(models.Model):
         verbose_name = 'Activity Log'
         verbose_name_plural = 'Activity Logs'
 
+    def save(self, *args, **kwargs):
+        from severynsor.utils import sanitize_text
+        if self.url:
+            self.url = sanitize_text(self.url)
+        if self.error_message:
+            self.error_message = sanitize_text(self.error_message)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         source = self.retriever.name if self.retriever and self.retriever.name else (self.sensor.title if self.sensor else "Unknown")
         return f"{self.get_type_display()} - {source} - {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"

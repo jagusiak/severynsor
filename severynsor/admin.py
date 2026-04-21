@@ -19,7 +19,7 @@ from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationFo
 from polymorphic.admin import PolymorphicParentModelAdmin, PolymorphicChildModelAdmin, PolymorphicChildModelFilter
 from .constants import MeasureType
 from .models import Location, Sensor, ValueSensor, ImageSensor, Record, ValueRecord, ImageRecord, SensorRetriever, OpenMeteoRetriever, OpenWeatherMapRetriever, RTSPRetriever, SystemDataRetriever, ActivityLog, Alarm
-from .widgets import ConditionBuilderWidget
+from .widgets import ConditionBuilderWidget, PasswordToggleWidget
 
 
 try:
@@ -392,13 +392,13 @@ class OpenWeatherMapRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name == 'api_key':
-            kwargs['widget'] = PasswordInput(render_value=True)
+            kwargs['widget'] = PasswordToggleWidget()
         return super().formfield_for_dbfield(db_field, request, **kwargs)
 
 @admin.register(RTSPRetriever)
 class RTSPRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
     base_model = SensorRetriever
-    list_display = ['name', 'sensor', 'rtsp_url', 'frequency_minutes', 'enabled']
+    list_display = ['name', 'sensor', 'masked_rtsp_url', 'frequency_minutes', 'enabled']
     actions = [disable_retrievers, enable_retrievers]
 
     def get_readonly_fields(self, request, obj=None):
@@ -409,8 +409,14 @@ class RTSPRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name == 'rtsp_url':
-            kwargs['widget'] = PasswordInput(render_value=True)
+            kwargs['widget'] = PasswordToggleWidget()
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    @admin.display(description="RTSP URL")
+    def masked_rtsp_url(self, obj):
+        if not obj.rtsp_url:
+            return "-"
+        return "••••••••"
 
 @admin.register(SystemDataRetriever)
 class SystemDataRetrieverAdmin(PolymorphicChildModelAdmin, ModelAdmin):

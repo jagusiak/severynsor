@@ -8,6 +8,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from .utils import sanitize_text
 
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class VideoStreamConsumer(AsyncWebsocketConsumer):
             retriever = await sync_to_async(RTSPRetriever.objects.get)(id=self.retriever_id)
             rtsp_url = retriever.rtsp_url.strip()
             
-            logger.info(f"Starting RTSP stream from {rtsp_url}")
+            logger.info(f"Starting RTSP stream from {sanitize_text(rtsp_url)}")
             
             # Opening the container is blocking
             try:
@@ -92,7 +93,7 @@ class VideoStreamConsumer(AsyncWebsocketConsumer):
                 )
             except Exception as e:
                 # If TCP fails or returns 400, try without forcing transport (allows UDP fallback)
-                logger.warning(f"Initial RTSP connection (TCP) failed for {rtsp_url}: {e}. Retrying with fallback...")
+                logger.warning(f"Initial RTSP connection (TCP) failed for {sanitize_text(rtsp_url)}: {e}. Retrying with fallback...")
                 if not self.streaming:
                     return
                     
@@ -102,7 +103,7 @@ class VideoStreamConsumer(AsyncWebsocketConsumer):
                         lambda: av.open(rtsp_url, options={'stimeout': '5000000'})
                     )
                 except Exception as ex:
-                    logger.error(f"RTSP stream connection failed for {rtsp_url}: {ex}")
+                    logger.error(f"RTSP stream connection failed for {sanitize_text(rtsp_url)}: {ex}")
                     await sync_to_async(ActivityLog.objects.create)(
                         type=ActivityLog.LIVE_STREAM,
                         sensor=retriever.sensor,

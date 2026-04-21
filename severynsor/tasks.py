@@ -16,6 +16,7 @@ from django.db import transaction
 from django.db.models import Count
 from django.db.models.functions import TruncHour
 from severynsor.models import Sensor, SensorRetriever, ValueSensor, ImageSensor, ValueRecord, ImageRecord
+from severynsor.utils import sanitize_text
 from severynsor.models.log import ActivityLog
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,7 @@ def grab_data_task(retriever_id):
         )
         return False
     except Exception as e:
-        error_msg = f"Error running retriever {retriever}: {e}"
+        error_msg = f"Error running retriever {retriever}: {sanitize_text(str(e))}"
         logger.error(error_msg)
         ActivityLog.objects.create(
             type=ActivityLog.RETRIEVER,

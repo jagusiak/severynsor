@@ -21,3 +21,13 @@ class ConditionBuilderWidget(forms.Widget):
             'attrs': attrs,
         }
         return mark_safe(render_to_string(self.template_name, context))
+
+class PasswordToggleWidget(forms.PasswordInput):
+    template_name = 'admin/severynsor/widgets/password_toggle.html'
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('render_value', True)
+        super().__init__(*args, **kwargs)
+
+    class Media:
+        js = ('js/password_toggle.js',)

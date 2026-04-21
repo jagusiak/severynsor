@@ -6,6 +6,7 @@ from django.core.files.base import ContentFile
 from .sensor_retriever import SensorRetriever
 from .record import ImageRecord
 from ..db_fields import EncryptedCharField
+from ..utils import sanitize_text
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class RTSPRetriever(SensorRetriever):
 
     def grab_data(self):
         # validation for image sensor is handled in clean.
-        logger.info(f"Grabbing image from RTSP URL: {self.rtsp_url}")
+        logger.info(f"Grabbing image from RTSP URL: {sanitize_text(self.rtsp_url)}")
         cap = cv2.VideoCapture(self.rtsp_url)
         if not cap.isOpened():
             raise Exception(f"Failed to open RTSP stream: {self.rtsp_url}")

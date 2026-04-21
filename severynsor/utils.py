@@ -1,5 +1,6 @@
 from django.db import models
 from django.apps import apps
+import re
 
 def get_active_alarms_badge(request):
     if not request.user.is_authenticated:
@@ -32,3 +33,15 @@ def get_media_size():
             if not os.path.islink(fp):
                 total_size += os.path.getsize(fp)
     return total_size
+
+def sanitize_text(text):
+    if not text:
+        return text
+    
+    # Sanitize RTSP URLs with credentials: rtsp://user:pass@host
+    text = re.sub(r'(rtsp://)([^:]+):([^@]+)(@)', r'\1***:***\4', text)
+    
+    # Sanitize query parameters like appid, api_key, token
+    text = re.sub(r'([?&](?:appid|api_key|token)=)([^&]+)', r'\1***', text)
+    
+    return text
