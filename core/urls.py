@@ -14,6 +14,8 @@ from severynsor.views import (
     system_view,
     trigger_maintenance_task,
     download_backup,
+    download_timelapse,
+    delete_timelapse,
 )
 
 urlpatterns = [
@@ -43,6 +45,8 @@ urlpatterns = [
          name='sensor_toggle_dashboard'),
     path('system/maintenance/', trigger_maintenance_task, name='trigger_maintenance_task'),
     path('system/backup/download/<str:filename>/', download_backup, name='download_backup'),
+    path('system/timelapse/download/<str:filename>/', download_timelapse, name='download_timelapse'),
+    path('system/timelapse/delete/<str:filename>/', delete_timelapse, name='delete_timelapse'),
     path('', admin.site.urls),
 ]
 

@@ -447,6 +447,29 @@ def system_view(request):
     # Sort backups by date dec
     backups.sort(key=lambda x: x['date'], reverse=True)
 
+    # Timelapse files
+    timelapse_dir = os.path.join(settings.BASE_DIR, 'timelapses')
+    timelapses = []
+    if os.path.exists(timelapse_dir):
+        for f in os.listdir(timelapse_dir):
+            if f.startswith('timelapse_') and f.endswith('.mp4'):
+                fpath = os.path.join(timelapse_dir, f)
+                stats = os.stat(fpath)
+                size_bytes = stats.st_size
+                if size_bytes < 1024 * 1024:
+                    size_str = f"{round(size_bytes / 1024, 1)} KB"
+                else:
+                    size_str = f"{round(size_bytes / (1024 * 1024), 2)} MB"
+                timelapses.append({
+                    'name': f,
+                    'size': size_str,
+                    'date': timezone.datetime.fromtimestamp(stats.st_mtime)
+                })
+    timelapses.sort(key=lambda x: x['date'], reverse=True)
+
+    # Image sensors for timelapse tool
+    image_sensor_list = ImageSensor.objects.all().order_by('title')
+
     context = {
         **admin.site.each_context(request),
         'title': 'System Statistics & Maintenance',
@@ -485,6 +508,8 @@ def system_view(request):
             }
         },
         'backups': backups,
+        'timelapses': timelapses,
+        'image_sensors': image_sensor_list,
         'is_superuser': request.user.is_superuser,
         'user': request.user,
     }
@@ -512,7 +537,8 @@ def trigger_maintenance_task(request):
         from .tasks import (
             cleanup_value_logs, cleanup_image_logs, 
             remove_old_value_entries, remove_old_image_entries,
-            cleanup_backups_task, create_backup_task, restore_backup_task
+            cleanup_backups_task, create_backup_task, restore_backup_task,
+            create_timelapse_task
         )
         
         backup_name = data.get('backup_name')
@@ -537,6 +563,22 @@ def trigger_maintenance_task(request):
             if not backup_name:
                 return JsonResponse({'status': 'error', 'message': 'Backup name is required for restore'}, status=400)
             async_task(restore_backup_task, user_email, backup_name)
+        elif task_type == 'create_timelapse':
+            sensor_id = data.get('sensor_id')
+            scale = data.get('scale', 100)
+            fps = data.get('fps', 24)
+            if not sensor_id:
+                return JsonResponse({'status': 'error', 'message': 'Image sensor is required'}, status=400)
+            try:
+                scale = int(scale)
+                fps = int(fps)
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid scale or FPS value'}, status=400)
+            if scale not in (100, 50, 25):
+                return JsonResponse({'status': 'error', 'message': 'Scale must be 100, 50, or 25'}, status=400)
+            if fps < 1 or fps > 60:
+                return JsonResponse({'status': 'error', 'message': 'FPS must be between 1 and 60'}, status=400)
+            async_task(create_timelapse_task, user_email, sensor_id, scale, fps)
         else:
             return JsonResponse({'status': 'error', 'message': 'Unknown task type'}, status=400)
             
@@ -564,3 +606,45 @@ def download_backup(request, filename):
         raise Http404("File not found")
         
     return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)
+
+
+@staff_member_required
+def download_timelapse(request, filename):
+    if not request.user.has_perm('severynsor.view_summary'):
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied
+
+    timelapse_dir = os.path.join(settings.BASE_DIR, 'timelapses')
+    file_path = os.path.join(timelapse_dir, filename)
+    
+    if not os.path.abspath(file_path).startswith(os.path.abspath(timelapse_dir)):
+        raise Http404("Invalid file path")
+        
+    if not os.path.exists(file_path):
+        raise Http404("File not found")
+        
+    return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)
+
+
+@staff_member_required
+def delete_timelapse(request, filename):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
+
+    if not request.user.has_perm('severynsor.view_summary'):
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+
+    timelapse_dir = os.path.join(settings.BASE_DIR, 'timelapses')
+    file_path = os.path.join(timelapse_dir, filename)
+    
+    if not os.path.abspath(file_path).startswith(os.path.abspath(timelapse_dir)):
+        return JsonResponse({'status': 'error', 'message': 'Invalid file path'}, status=400)
+        
+    if not os.path.exists(file_path):
+        return JsonResponse({'status': 'error', 'message': 'File not found'}, status=404)
+
+    try:
+        os.remove(file_path)
+        return JsonResponse({'status': 'success', 'message': 'Timelapse deleted successfully.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

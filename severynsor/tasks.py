@@ -349,3 +349,108 @@ def restore_backup_task(user_email, backup_name):
         # Cleanup temp directory
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+
+def create_timelapse_task(user_email, sensor_id, scale, fps):
+    """
+    Generate a timelapse MP4 from all ImageRecord images of an ImageSensor.
+    scale: 100, 50, or 25 (percentage of original)
+    fps: frames per second for output video
+    """
+    temp_dir = None
+    try:
+        from severynsor.models import ImageSensor, ImageRecord
+
+        sensor = ImageSensor.objects.get(pk=sensor_id)
+        records = ImageRecord.objects.filter(
+            sensor=sensor, image__isnull=False
+        ).exclude(image='').order_by('timestamp')
+
+        if not records.exists():
+            _send_task_email(user_email, "Create Timelapse", False, f"No images found for sensor '{sensor.title}'.")
+            return
+
+        timelapse_dir = os.path.join(settings.BASE_DIR, 'timelapses')
+        os.makedirs(timelapse_dir, exist_ok=True)
+
+        temp_dir = tempfile.mkdtemp()
+        frame_count = 0
+
+        # Determine scale filter for ffmpeg
+        scale_filter = ""
+        if scale == 50:
+            scale_filter = "scale=iw/2:ih/2,"
+        elif scale == 25:
+            scale_filter = "scale=iw/4:ih/4,"
+
+        # Copy and rename images sequentially for ffmpeg
+        for i, record in enumerate(records):
+            try:
+                src_path = record.image.path
+                if not os.path.exists(src_path):
+                    continue
+                # Use a fixed naming pattern: frame_000001.jpg, etc.
+                ext = os.path.splitext(src_path)[1].lower()
+                if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.bmp'):
+                    ext = '.jpg'
+                dst_name = f"frame_{frame_count:06d}{ext}"
+                dst_path = os.path.join(temp_dir, dst_name)
+                shutil.copy2(src_path, dst_path)
+                frame_count += 1
+            except Exception:
+                continue
+
+        if frame_count == 0:
+            _send_task_email(user_email, "Create Timelapse", False, f"No valid image files found on disk for sensor '{sensor.title}'.")
+            return
+
+        # Determine the extension from the first file
+        first_frame = sorted(os.listdir(temp_dir))[0]
+        ext = os.path.splitext(first_frame)[1]
+
+        timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+        safe_title = "".join(c if c.isalnum() or c in '-_' else '_' for c in sensor.title)
+        output_filename = f"timelapse_{safe_title}_{timestamp}.mp4"
+        output_path = os.path.join(timelapse_dir, output_filename)
+
+        # Build ffmpeg command
+        input_pattern = os.path.join(temp_dir, f"frame_%06d{ext}")
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',
+            '-framerate', str(int(fps)),
+            '-i', input_pattern,
+            '-vf', f'{scale_filter}format=yuv420p',
+            '-c:v', 'libx264',
+            '-preset', 'medium',
+            '-crf', '23',
+            '-movflags', '+faststart',
+            output_path
+        ]
+
+        result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=3600)
+        if result.returncode != 0:
+            raise Exception(f"ffmpeg failed: {result.stderr[-500:]}")
+
+        # Get output file size
+        output_size = os.path.getsize(output_path)
+        if output_size < 1024 * 1024:
+            size_str = f"{round(output_size / 1024, 1)} KB"
+        else:
+            size_str = f"{round(output_size / (1024 * 1024), 2)} MB"
+
+        _send_task_email(
+            user_email,
+            "Create Timelapse",
+            True,
+            f"Timelapse created for sensor '{sensor.title}'.\n"
+            f"Frames: {frame_count}, FPS: {fps}, Scale: {scale}%\n"
+            f"File: {output_filename} ({size_str})"
+        )
+    except ImageSensor.DoesNotExist:
+        _send_task_email(user_email, "Create Timelapse", False, f"Image sensor with ID {sensor_id} not found.")
+    except Exception as e:
+        logger.error(f"Timelapse creation failed: {e}\n{traceback.format_exc()}")
+        _send_task_email(user_email, "Create Timelapse", False, f"Error: {str(e)}")
+    finally:
+        if temp_dir and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)

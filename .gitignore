@@ -11,6 +11,8 @@ db.sqlite3
 media/
 /static/
 !/severynsor/static/
+backups/
+timelapses/
 
 # IDEs
 .idea/

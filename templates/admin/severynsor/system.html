@@ -298,6 +298,49 @@
     .action-link:hover {
         opacity: 0.8;
     }
+
+    /* Modal form controls */
+    .modal-content select,
+    .modal-content input[type="number"] {
+        width: 100%;
+        border-radius: 0.5rem;
+        border: 1px solid #e5e7eb;
+        background-color: white;
+        color: #111827;
+        padding: 0.625rem 0.75rem;
+        font-size: 0.875rem;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        -webkit-appearance: none;
+    }
+    .modal-content select:focus,
+    .modal-content input[type="number"]:focus {
+        border-color: #10b981;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+    }
+    .dark .modal-content select,
+    .dark .modal-content input[type="number"] {
+        background-color: #111827;
+        border-color: #374151;
+        color: #f3f4f6;
+    }
+    .dark .modal-content select:focus,
+    .dark .modal-content input[type="number"]:focus {
+        border-color: #10b981;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+    .modal-content label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b7280;
+        margin-bottom: 0.375rem;
+    }
+    .dark .modal-content label {
+        color: #9ca3af;
+    }
 </style>
 {% endblock %}
 
@@ -578,10 +621,72 @@
                 </div>
                 {% endif %}
             </div>
+
+            <!-- Timelapse Tool -->
+            <div class="maintenance-card border-cyan-200 dark:border-cyan-900 bg-cyan-50/30 dark:bg-cyan-900/10">
+                <div class="maintenance-info">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="material-symbols-outlined text-cyan-500">timelapse</span>
+                        <h3 class="text-cyan-900 dark:text-cyan-300">Timelapse Generator</h3>
+                    </div>
+                    <p>Create a compressed MP4 timelapse video from image sensor captures. Runs in background and sends email when complete.</p>
+                </div>
+
+                <div class="maintenance-actions">
+                    <button onclick="openTimelapseModal()" class="btn-maintenance btn-primary-soft">
+                        <span class="material-symbols-outlined text-sm">movie_creation</span>
+                        Create Timelapse
+                    </button>
+                </div>
+
+                {% if timelapses %}
+                <div class="mt-4 border-t border-cyan-100 dark:border-cyan-900 pt-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-cyan-500 mb-2">Generated Timelapses</h4>
+                    <div class="overflow-x-auto">
+                        <table class="backup-table">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Date</th>
+                                    <th>Size</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for tl in timelapses %}
+                                <tr id="tl-row-{{ forloop.counter }}">
+                                    <td class="text-xs font-mono text-gray-700 dark:text-gray-300 max-w-[200px] truncate" title="{{ tl.name }}">{{ tl.name }}</td>
+                                    <td class="whitespace-nowrap">{{ tl.date|date:"Y-m-d H:i" }}</td>
+                                    <td>{{ tl.size }}</td>
+                                    <td>
+                                        <div class="flex gap-4 items-center">
+                                            <a href="{% url 'download_timelapse' tl.name %}" class="action-link text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300">
+                                                <span class="material-symbols-outlined text-sm">download</span>
+                                                Download
+                                            </a>
+                                            <button onclick="deleteTimelapse('{{ tl.name }}', 'tl-row-{{ forloop.counter }}')" class="action-link text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 border-none bg-transparent p-0 cursor-pointer">
+                                                <span class="material-symbols-outlined text-sm">delete</span>
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% else %}
+                <div class="mt-4 text-center py-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm text-gray-500">
+                    No timelapses generated yet.
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
 
+<!-- Confirm Modal (for maintenance tasks) -->
 <div id="confirmModal" class="modal-backdrop">
     <div class="modal-content">
         <h2 id="modalTitle" class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Confirm Operation</h2>
@@ -589,6 +694,48 @@
         <div class="flex justify-end gap-3 mt-6">
             <button onclick="closeModal()" class="btn-cancel">Cancel</button>
             <button id="confirmBtn" class="btn-confirm">Confirm & Run</button>
+        </div>
+    </div>
+</div>
+
+<!-- Timelapse Modal -->
+<div id="timelapseModal" class="modal-backdrop">
+    <div class="modal-content">
+        <h2 class="text-xl font-bold mb-2 text-gray-900 dark:text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-cyan-500">movie_creation</span>
+            Create Timelapse
+        </h2>
+        <p class="text-gray-500 dark:text-gray-400 text-sm mb-6">Configure and generate a compressed MP4 timelapse from image sensor captures.</p>
+
+        <div class="flex flex-col gap-4">
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Image Sensor</label>
+                <select id="timelapse-sensor" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all">
+                    <option value="">— Select sensor —</option>
+                    {% for s in image_sensors %}
+                    <option value="{{ s.pk }}">{{ s.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Resolution</label>
+                    <select id="timelapse-scale" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all">
+                        <option value="100">Original (100%)</option>
+                        <option value="50" selected>Half (50%)</option>
+                        <option value="25">Quarter (25%)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Frames per Second</label>
+                    <input type="number" id="timelapse-fps" value="24" min="1" max="60" class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-8">
+            <button onclick="closeTimelapseModal()" class="btn-cancel">Cancel</button>
+            <button id="timelapseConfirmBtn" onclick="runTimelapse()" class="btn-confirm">Generate</button>
         </div>
     </div>
 </div>
@@ -608,6 +755,7 @@
         document.getElementById('tab-content-tools').classList.toggle('hidden', tabId !== 'tools');
     }
 
+    // ── Confirm modal (maintenance tasks) ──────────────────────────────
     let currentTask = null;
     let currentBackupName = null;
 
@@ -660,6 +808,84 @@
             } else alert('Error: ' + data.message);
         } catch (error) { alert('Failed: ' + error); }
         finally { btn.disabled = false; btn.innerText = 'Confirm & Run'; }
+    }
+
+    // ── Timelapse modal ────────────────────────────────────────────────
+    function openTimelapseModal() {
+        document.getElementById('timelapseModal').style.display = 'flex';
+    }
+
+    function closeTimelapseModal() {
+        document.getElementById('timelapseModal').style.display = 'none';
+    }
+
+    async function runTimelapse() {
+        const sensorId = document.getElementById('timelapse-sensor').value;
+        const scale = document.getElementById('timelapse-scale').value;
+        const fps = document.getElementById('timelapse-fps').value;
+
+        if (!sensorId) {
+            alert('Please select an image sensor.');
+            return;
+        }
+
+        const btn = document.getElementById('timelapseConfirmBtn');
+        btn.disabled = true;
+        btn.innerText = 'Scheduling...';
+
+        try {
+            const response = await fetch('{% url "trigger_maintenance_task" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({
+                    task_type: 'create_timelapse',
+                    sensor_id: sensorId,
+                    scale: parseInt(scale),
+                    fps: parseInt(fps)
+                })
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                alert('Timelapse generation scheduled! You will receive an email when it is ready.');
+                closeTimelapseModal();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            alert('Failed: ' + error);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Generate';
+        }
+    }
+
+    // ── Timelapse file management ──────────────────────────────────────
+    async function deleteTimelapse(filename, rowId) {
+        if (!confirm('Delete timelapse "' + filename + '"? This cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/system/timelapse/delete/' + encodeURIComponent(filename) + '/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+
+            const data = await response.json();
+            if (data.status === 'success') {
+                const row = document.getElementById(rowId);
+                if (row) {
+                    row.style.transition = 'opacity 0.3s ease';
+                    row.style.opacity = '0';
+                    setTimeout(() => row.remove(), 300);
+                }
+            } else {
+                alert('Error: ' + data.message);
+            }
+        } catch (error) {
+            alert('Failed: ' + error);
+        }
     }
 </script>
 {% endblock %}
