@@ -44,12 +44,10 @@ class TapoRetriever(SensorRetriever):
         client = ApiClient(self.username, self.password)
         hub = await client.h100(self.ip_address)
         # The tapo python wrapper exposes child devices via specific methods.
-        if hasattr(hub, 't310'):
-            child_device = hub.t310(self.device_id)
-        elif hasattr(hub, 't315'):
-            child_device = hub.t315(self.device_id)
+        if hasattr(hub, 't31x'):
+            child_device = hub.t31x(self.device_id)
         else:
-            raise ValueError(f"Tapo library does not support t310/t315 on hub {self.ip_address}")
+            raise ValueError(f"Tapo library does not support t31x on hub {self.ip_address}")
         
         records_obj = await child_device.get_temperature_humidity_records()
         
