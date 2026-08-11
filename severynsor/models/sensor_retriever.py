@@ -41,6 +41,7 @@ class SensorRetriever(PolymorphicModel):
         from .open_weather_map_retriever import OpenWeatherMapRetriever
         from .rtsp_retriever import RTSPRetriever
         from .system_data_retriever import SystemDataRetriever
+        from .tapo_retriever import TapoRetriever
         from .sensor import ValueSensor, ImageSensor
 
         try:
@@ -49,7 +50,7 @@ class SensorRetriever(PolymorphicModel):
                 if orig.sensor_id != self.sensor_id:
                     raise ValidationError({"sensor": "Cannot change the sensor once the retriever is created."})
 
-            if isinstance(self, (OpenMeteoRetriever, OpenWeatherMapRetriever, SystemDataRetriever)):
+            if isinstance(self, (OpenMeteoRetriever, OpenWeatherMapRetriever, SystemDataRetriever, TapoRetriever)):
                 if not isinstance(self.sensor, ValueSensor):
                     raise ValidationError({"sensor": "Value-based retriever can only be assigned to a ValueSensor."})
                 

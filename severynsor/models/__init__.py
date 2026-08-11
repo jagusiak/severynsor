@@ -6,6 +6,7 @@ from .open_meteo_retriever import OpenMeteoRetriever
 from .open_weather_map_retriever import OpenWeatherMapRetriever
 from .rtsp_retriever import RTSPRetriever
 from .system_data_retriever import SystemDataRetriever
+from .tapo_retriever import TapoRetriever
 from .log import ActivityLog
 from .alarm import Alarm
 
@@ -23,6 +24,7 @@ __all__ = [
     'OpenWeatherMapRetriever',
     'RTSPRetriever',
     'SystemDataRetriever',
+    'TapoRetriever',
     'ActivityLog',
     'Alarm',
 ]
