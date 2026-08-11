@@ -36,13 +36,29 @@ class TapoRetriever(SensorRetriever):
         ]
 
     def grab_data(self):
-        async_to_sync(self.grab_data_async)()
+        # Access sensor and its measure_type synchronously to avoid async context errors
+        sensor = self.sensor
+        if hasattr(sensor, 'valuesensor'):
+            actual_type = sensor.valuesensor.measure_type
+        else:
+            actual_type = getattr(sensor, 'measure_type', None)
 
-    async def grab_data_async(self):
+        # Call the async function to fetch the value
+        value = async_to_sync(self.fetch_tapo_value_async)(actual_type)
+
+        if value is not None:
+            ValueRecord.objects.create(
+                sensor=sensor,
+                value=value,
+                timestamp=timezone.now()
+            )
+
+    async def fetch_tapo_value_async(self, actual_type):
         from tapo import ApiClient
         
         client = ApiClient(self.username, self.password)
         hub = await client.h100(self.ip_address)
+        
         # The tapo python wrapper exposes child devices via specific methods.
         if hasattr(hub, 't31x'):
             child_device = await hub.t31x(self.device_id)
@@ -55,7 +71,7 @@ class TapoRetriever(SensorRetriever):
         records = getattr(records_obj, 'records', records_obj)
         
         if not records:
-            return
+            return None
             
         # Get the latest record
         def get_time(r):
@@ -67,10 +83,6 @@ class TapoRetriever(SensorRetriever):
             
         latest_record = sorted(records, key=get_time)[-1]
         
-        actual_type = getattr(getattr(self, 'sensor', None), 'measure_type', None)
-        if hasattr(self.sensor, 'valuesensor'):
-            actual_type = self.sensor.valuesensor.measure_type
-            
         from severynsor.constants import MeasureType
         value = None
         
@@ -85,9 +97,4 @@ class TapoRetriever(SensorRetriever):
             elif isinstance(latest_record, dict):
                 value = latest_record.get('humidity')
                 
-        if value is not None:
-            ValueRecord.objects.create(
-                sensor=self.sensor,
-                value=value,
-                timestamp=timezone.now()
-            )
+        return value
